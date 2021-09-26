@@ -1389,6 +1389,8 @@ dependencies = [
  "bevy",
  "bevycheck",
  "futures-lite",
+ "serde",
+ "toml",
 ]
 
 [[package]]

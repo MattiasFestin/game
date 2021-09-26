@@ -9,3 +9,5 @@ edition = "2018"
 bevy = { version = "0.5.0", features = ["dynamic"] }
 bevycheck = "0.1"
 futures-lite = "1.12"
+serde = "1.0"
+toml = "0.5"
