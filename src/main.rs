@@ -1,6 +1,8 @@
 #[macro_use] extern crate bevy;
 #[macro_use] extern crate bevycheck;
 #[macro_use] extern crate serde;
+extern crate bevy_mod_bounding;
+extern crate bevy_frustum_culling;
 
 use std::collections::HashMap;
 use std::fs;
@@ -8,21 +10,46 @@ use std::ops::Add;
 use std::str::FromStr;
 
 use bevy::asset::HandleId;
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::reflect::{TypeUuid, TypeUuidDynamic, Uuid};
 use bevy::render::colorspace::HslRepresentation;
 use bevy::tasks::{AsyncComputeTaskPool, Task};
 use bevy::pbr::*;
+use bevy_frustum_culling::Bounded;
+use constants::{CHUNK_SIZE, CHUNK_SIZE_CUBE};
 use futures_lite::future;
+
+mod constants;
+mod camera;
+mod input;
 
 fn main() {
     App::build()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+
+        .add_plugin(LogDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+
+
+        .add_plugin(bevy_frustum_culling::BoundingVolumePlugin::<bevy_frustum_culling::aabb::Aabb>::default())
+
+        //Camera
+        .add_startup_system(camera::setup_camera.system())
+
+        //Input register
+        .init_resource::<input::GamepadLobby>()
+        .add_system_to_stage(CoreStage::PreUpdate, input::connection_system.system())
+        .add_system(input::gamepad_system.system())
+
         .add_startup_system(setup_env.system())
         .add_startup_system(add_assets.system())
         .add_startup_system(spawn_tasks.system())
+        .add_system(rotation_system.system())
         .add_system(handle_tasks.system())
+
+        //Start game
         .run();
 }
 
@@ -38,16 +65,12 @@ impl Default for Voxel {
         Self { position: Vec3::ZERO , pbr_id: 0u64 }
     }
 }
-
-
-const CHUNK_SIZE: usize = 10;
-const CHUNK_SIZE_CUBE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-
 #[derive(Debug, PartialEq, Clone, Reflect)]
 #[reflect(Component, PartialEq)]
 struct VoxelChunk {
     pub position: Vec3,
     pub voxels: Vec<Voxel>
+    // pub bounding_box: 
 }
 
 impl Default for VoxelChunk {
@@ -68,7 +91,7 @@ impl Default for VoxelChunk {
                 let position = Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
                 Voxel {
                     position,
-                    pbr_id: ((x + y) % 2) as u64
+                    pbr_id: ((x + y + z) % 2) as u64
                 }
             }).collect() 
         }
@@ -89,8 +112,7 @@ static mut material_mappings: Option<HashMap<u64, StandardMaterial>> = None;
 
 fn add_assets(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>
 ) {
     let box_mesh_handle = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
@@ -125,21 +147,21 @@ fn spawn_tasks(
         thread_pool: Res<AsyncComputeTaskPool>
     ) {
     //TODO: Spawn in new chunks
-    let chunk = VoxelChunk::default();
+    // let chunk = VoxelChunk::default();
 
-    for voxel in chunk.voxels {
+    // for voxel in chunk.voxels {
         let task = thread_pool.spawn(async move {
-            let mut v= voxel.clone();
-            // v.pbr_id = Some(HandleId::new(
-            //     Uuid::from_str("2642b340-7267-4b72-8af7-bb4f279508dd").unwrap(), 
-            //     2
-            // ));
-            return v;
+            // let mut v= voxel.clone();
+            // // v.pbr_id = Some(HandleId::new(
+            // //     Uuid::from_str("2642b340-7267-4b72-8af7-bb4f279508dd").unwrap(), 
+            // //     2
+            // // ));
+            return VoxelChunk::default();
         });
 
         // Spawn new entity and add our new task as a component
         commands.spawn().insert(task);
-    }
+    // }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -242,129 +264,72 @@ impl PbrConfig {
 
 fn handle_tasks<'a>(
     mut commands: Commands,
-    mut voxel_chunk_tasks: Query<(Entity, &mut Task<Voxel>)>,
+    mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     box_mesh_handle: Res<BoxMeshHandle>,
-    // material_mappings: ResMut<MaterialMapping>,
-    // box_other_material_handle: Res<BoxOtherMaterialHandle>,
 ) {
     for (entity, mut task) in voxel_chunk_tasks.iter_mut() {
-        if let Some(voxel) = future::block_on(future::poll_once(&mut *task)) {
+        if let Some(voxel_chunk) = future::block_on(future::poll_once(&mut *task)) {
 
-            // let uuid = Uuid::from_u128((voxel.pbr_id * 6299357110868187461) as u128);
-            // let material_id = HandleId::new(uuid, voxel.pbr_id);
-            
-            // let handle = Handle::<StandardMaterial>::weak(material_id);
-            // let mat: StandardMaterial;
-            // {
-            //     // let path = &voxel.pbr_id.to_string();
-            //     let pbr= materials.get(path).unwrap();
-            //     mat = StandardMaterial {
-            //         base_color: pbr.base_color,
-            //         emissive: pbr.emissive,
-            //         ..Default::default()
-            //     };
-            //     println!("handle: {:?}", pbr);
-            // }
-            
-			// if let Some(handler_id) = voxel.material {
-                // materials.get_or_insert_with(handler_id, || {
+            for voxel in voxel_chunk.voxels {
 
-                // });
-            let mut mat: Option<&StandardMaterial> = None;
-            unsafe {
-                if let Some(mm) = &material_mappings {
-                    println!("pbr_id: {:?}", voxel.pbr_id);
-                    mat = mm.get(&voxel.pbr_id);
+                let mut mat: Option<&StandardMaterial> = None;
+                unsafe {
+                    if let Some(mm) = &material_mappings {
+                        println!("pbr_id: {:?}", voxel.pbr_id);
+                        mat = mm.get(&voxel.pbr_id);
+                    }
+                }
+
+                if let Some(m) = mat {
+                    commands
+                        .spawn_bundle(PbrBundle {
+                            visible: Visible {
+                                is_visible: true,
+                                is_transparent: false,
+                            },
+                            mesh: box_mesh_handle.0.clone(),
+                            material: materials.add(StandardMaterial {
+                                base_color: m.base_color,
+                                ..Default::default()
+                            }),
+                            transform: Transform::from_translation(voxel.position),
+                            ..Default::default()
+                        })
+                        .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
+                        // .insert(Bounded::<bevy_frustum_culling::sphere::BSphere>::default())
+                        .insert(bevy_frustum_culling::debug::DebugBounds)
+                        .insert(Rotator);
                 }
             }
 
-            if let Some(m) = mat {
-                commands.entity(entity).insert_bundle(PbrBundle {
-                    mesh: box_mesh_handle.0.clone(),
-                    material: materials.add(StandardMaterial {
-                        base_color: m.base_color,
-                        ..Default::default()
-                    }),
-                    transform: Transform::from_translation(voxel.position),
-                    ..Default::default()
-                });
-            }
-			// }
-            // if let Some(material) = materials.get(&voxel.pbr_id) {
-            //         let material_id = HandleId::new(material.uuid, material.id);
-            //         let handle = Handle::<StandardMaterial>::weak(material_id);
-                
-            //         let pbr = material.pbr();
-            //         if materials.get(handle.clone()).is_none() {
-            //             materials.set_untracked(handle.clone(), pbr);
-            //         }
-
-                    
-            // }
-
-            //TODO: Load from disk
-            // let surf = match voxel.pbr_id {
-            //     0 => {
-            //         Some(box_material_handle.0.clone())
-            //     },
-
-            //     1 => {
-            //         let material = PbrConfig {
-            //             id: voxel.pbr_id,
-            //             uuid: Uuid::from_u128((voxel.pbr_id * 6299357110868187461) as u128),
-            //             color: [0, 255, 255],
-            //             ..Default::default()
-            //         };
-            //         let material_id = HandleId::new(material.uuid, material.id);
-            //         let pbr = material.pbr();
-            //         let handle = Handle::<StandardMaterial>::weak(material_id);
-            //         // materials.get_or_insert_with(handle, insert_fn)
-                    
-            //         if materials.get(handle.clone()).is_none() {
-            //             materials.set_untracked(handle.clone(), pbr);
-            //         }
-
-            //         Some(handle.clone())
-            //     }
-
-            //     _ => {
-            //         None
-            //     }
-            // };
-
-            // if let Some(mat) = surf {
-                
-            // }
-            
-            
-
             // Task is complete, so remove task component from entity
-            commands.entity(entity).remove::<Task<Voxel>>();
+            commands.entity(entity).remove::<Task<VoxelChunk>>();
         }
     }
 }
 
 fn setup_env(mut commands: Commands) {
-    // Used to center camera on spawned cubes
-    let offset = if CHUNK_SIZE % 2 == 0 {
-        (CHUNK_SIZE / 2) as f32 - 0.5
-    } else {
-        (CHUNK_SIZE / 2) as f32
-    };
-
-    // println!("offset: {:?}", offset);
-
     // lights
     commands.spawn_bundle(LightBundle {
         transform: Transform::from_translation(Vec3::new(0.8, 0.8, 0.8)),
         ..Default::default()
     });
+}
 
-    // camera
-    commands.spawn_bundle(PerspectiveCameraBundle {
-        transform: Transform::from_translation(Vec3::new(offset, offset, CHUNK_SIZE as f32 * 3.0f32))
-            .looking_at(Vec3::new(offset, offset, 0.0), Vec3::Y),
-        ..Default::default()
+struct Rotator;
+/// Rotate the meshes to demonstrate how the bounding volumes update
+fn rotation_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
+    query.for_each_mut(|mut transform| {
+        // println!("{:?}", transform.visible.is_visible);
+        // let scale = ::ONE * ((time.seconds_since_startup() as f32).sin() * 0.3 + 1.0) * 0.3;
+        let rot_x = Quat::from_rotation_x(time.delta_seconds() as f32 * 5.0);
+        let rot_y = Quat::from_rotation_y(time.delta_seconds() as f32 * 3.0);
+        let rot_z = Quat::from_rotation_z(time.delta_seconds() as f32 * 2.0);
+        // transform.scale = scale;
+        transform.rotate(rot_x * rot_y * rot_z);
     });
+    // for mut transform in query.iter_mut() { //.filter(|x| x.visible.is_visible)
+       
+    // }
 }
