@@ -5,7 +5,10 @@ extern crate bevy_mod_bounding;
 extern crate bevy_frustum_culling;
 extern crate rayon;
 extern crate num_cpus;
+extern crate bevy_rng;
 
+use bevy::core::FixedTimestep;
+use bevy_rng::Rng;
 use rayon::prelude::*;
 
 use std::collections::HashMap;
@@ -24,9 +27,12 @@ use bevy_frustum_culling::Bounded;
 use constants::{CHUNK_SIZE, CHUNK_SIZE_CUBE};
 use futures_lite::future;
 
+use bevy_rng::*;
+
 mod constants;
 mod camera;
 mod input;
+mod physics;
 
 fn main() {
     App::build()
@@ -35,7 +41,7 @@ fn main() {
 
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
-
+        .add_plugin(RngPlugin::from(42))
 
         .add_plugin(bevy_frustum_culling::BoundingVolumePlugin::<bevy_frustum_culling::aabb::Aabb>::default())
         .add_plugin(bevy_frustum_culling::FrustumCullingPlugin::<bevy_frustum_culling::aabb::Aabb>::default())
@@ -46,13 +52,23 @@ fn main() {
         //Input register
         .init_resource::<input::GamepadLobby>()
         .add_system_to_stage(CoreStage::PreUpdate, input::connection_system.system())
-        .add_system(input::gamepad_system.system())
+        .add_system(input::gamepad_system.system().label("gamepad"))
 
         .add_startup_system(setup_env.system())
         .add_startup_system(add_assets.system())
         .add_startup_system(spawn_tasks.system())
-        .add_system(rotation_system.system())
+
+        // .add_system(rotation_system.system())
         .add_system(handle_tasks.system())
+
+        .add_system(physics::position.system().label(physics::PhysicsSystem::Position).after(physics::PhysicsSystem::Velocity))
+        .add_system_set(SystemSet::new()
+            .label(physics::Physics)
+            .with_run_criteria(FixedTimestep::step(constants::PHYSICS_TICKS))
+            .with_system(physics::velocity.system().label(physics::PhysicsSystem::Velocity).after(physics::PhysicsSystem::Force))
+            .with_system(physics::force.system().label(physics::PhysicsSystem::Force))
+            .with_system(physics::gravity.system().label(physics::PhysicsSystem::Gravity).before(physics::PhysicsSystem::Force))
+        )
 
         //Start game
         .run();
@@ -62,12 +78,13 @@ fn main() {
 #[reflect(Component, PartialEq)]
 struct Voxel {
     pub position: Vec3,
+    pub id: u64,
     pub pbr_id: u64
 }
 
 impl Default for Voxel {
     fn default() -> Self {
-        Self { position: Vec3::ZERO , pbr_id: 0u64 }
+        Self { position: Vec3::ZERO , pbr_id: 0u64, id: 0u64 }
     }
 }
 #[derive(Debug, PartialEq, Clone, Reflect)]
@@ -93,10 +110,11 @@ impl Default for VoxelChunk {
                 let z = rest % CHUNK_SIZE;
 
 
-                let position = Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
+                let position = 10.0*Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
                 Voxel {
+                    id: index as u64,
                     position,
-                    pbr_id: ((x + y + z) % 2) as u64
+                    pbr_id: ((x + y + z) % 2) as u64 + 1
                 }
             }).collect() 
         }
@@ -272,6 +290,7 @@ fn handle_tasks<'a>(
     mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     box_mesh_handle: Res<BoxMeshHandle>,
+    mut rng: Local<Rng>
 ) {
     for (entity, mut task) in voxel_chunk_tasks.iter_mut() {
         if let Some(voxel_chunk) = future::block_on(future::poll_once(&mut *task)) {
@@ -296,18 +315,115 @@ fn handle_tasks<'a>(
                             },
                             mesh: box_mesh_handle.0.clone(),
                             material: materials.add(StandardMaterial {
+                                double_sided: m.double_sided,
                                 base_color: m.base_color,
+                                metallic: m.metallic,
+                                reflectance: m.reflectance,
+                                roughness: m.roughness,
+                                emissive: m.emissive,
+                                unlit: m.unlit,
                                 ..Default::default()
                             }),
                             transform: Transform::from_translation(voxel.position),
                             ..Default::default()
                         })
                         .insert(bevy_frustum_culling::aabb::Aabb::default())
+                        .insert(physics::Position {
+                            position: voxel.position
+                        })
+                        .insert(physics::Velocity {
+                            velocity: Vec3::ZERO,
+                        })
+                        .insert(physics::Force {
+                            force: Vec3::new(rng.gen::<f32>()* - 0.5, rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5),
+                            is_dirty: true
+                        })
+                        .insert( physics::Mass {
+                            mass: 125000000.0,//rng.gen::<f32>()*10.0,
+                        })
+                        .insert(physics::Identity {
+                            id: voxel.id
+                        })
                         // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
                         // .insert(bevy_frustum_culling::debug::DebugBounds)
-                        .insert(Rotator);
+                        ;
                 }
             }
+
+            // //Center heavy cube
+            // commands
+            //             .spawn()
+            //             .insert_bundle(PbrBundle {
+            //                 visible: Visible {
+            //                     is_visible: true,
+            //                     is_transparent: false,
+            //                 },
+            //                 mesh: box_mesh_handle.0.clone(),
+            //                 material: materials.add(StandardMaterial {
+            //                     double_sided: false,
+            //                     base_color: Color::ALICE_BLUE,
+            //                     ..Default::default()
+            //                 }),
+            //                 transform: Transform::from_translation(Vec3::ZERO),
+            //                 ..Default::default()
+            //             })
+            //             .insert(bevy_frustum_culling::aabb::Aabb::default())
+            //             .insert(physics::Position {
+            //                 position: Vec3::new(CHUNK_SIZE as f32 / 2.0, CHUNK_SIZE as f32 / 2.0, CHUNK_SIZE as f32 / 2.0)
+            //             })
+            //             .insert(physics::Velocity {
+            //                 velocity: Vec3::ZERO,
+            //             })
+            //             .insert(physics::Force {
+            //                 force: Vec3::ZERO,
+            //                 is_dirty: false
+            //             })
+            //             .insert( physics::Mass {
+            //                 mass: 1498284460.0,
+            //             })
+            //             .insert(physics::Identity {
+            //                 id: 99999999
+            //             })
+                        // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
+                        // .insert(bevy_frustum_culling::debug::DebugBounds)
+                        ;
+
+                // commands
+                //         .spawn()
+                //         .insert_bundle(PbrBundle {
+                //             visible: Visible {
+                //                 is_visible: true,
+                //                 is_transparent: false,
+                //             },
+                //             mesh: box_mesh_handle.0.clone(),
+                //             material: materials.add(StandardMaterial {
+                //                 double_sided: false,
+                //                 base_color: Color::ALICE_BLUE,
+                //                 ..Default::default()
+                //             }),
+                //             transform: Transform::from_translation(Vec3::ZERO),
+                //             ..Default::default()
+                //         })
+                //         .insert(bevy_frustum_culling::aabb::Aabb::default())
+                //         .insert(physics::Position {
+                //             position: Vec3::new(-10.0, -10.0, -10.0)
+                //         })
+                //         .insert(physics::Velocity {
+                //             velocity: Vec3::ZERO,
+                //         })
+                //         .insert(physics::Force {
+                //             force: Vec3::ZERO,
+                //             is_dirty: false
+                //         })
+                //         .insert( physics::Mass {
+                //             mass: 14982844643.0,
+                //         })
+                //         .insert(physics::Identity {
+                //             id: 99999999+1
+                //         })
+                //         // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
+                //         // .insert(bevy_frustum_culling::debug::DebugBounds)
+                //         ;
 
             // Task is complete, so remove task component from entity
             commands.entity(entity).remove::<Task<VoxelChunk>>();
@@ -323,22 +439,22 @@ fn setup_env(mut commands: Commands) {
     });
 }
 
-struct Rotator;
-/// Rotate the meshes to demonstrate how the bounding volumes update
-fn rotation_system(
-        time: Res<Time>,
-        thread_pool: Res<ComputeTaskPool>,
-        mut query: Query<(&mut Transform, Option<&Visible>), With<Rotator>>
-    ) {
-    // let tp = TaskPool::new();
-    query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut transform, visible)| {
-        if visible.is_some() && visible.unwrap().is_visible {
-            // let scale = ::ONE * ((time.seconds_since_startup() as f32).sin() * 0.3 + 1.0) * 0.3;
-            let rot_x = Quat::from_rotation_x(time.delta_seconds() as f32 * 5.0);
-            let rot_y = Quat::from_rotation_y(time.delta_seconds() as f32 * 3.0);
-            let rot_z = Quat::from_rotation_z(time.delta_seconds() as f32 * 2.0);
-            // transform.scale = scale;
-            transform.rotate(rot_x * rot_y * rot_z);
-        }
-    });
-}
+// struct Rotator;
+// /// Rotate the meshes to demonstrate how the bounding volumes update
+// fn rotation_system(
+//         time: Res<Time>,
+//         thread_pool: Res<ComputeTaskPool>,
+//         mut query: Query<(&mut Transform, Option<&Visible>), With<Rotator>>
+//     ) {
+//     // let tp = TaskPool::new();
+//     query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut transform, visible)| {
+//         if visible.is_some() && visible.unwrap().is_visible {
+//             // let scale = ::ONE * ((time.seconds_since_startup() as f32).sin() * 0.3 + 1.0) * 0.3;
+//             let rot_x = Quat::from_rotation_x(time.delta_seconds() as f32 * 5.0);
+//             let rot_y = Quat::from_rotation_y(time.delta_seconds() as f32 * 3.0);
+//             let rot_z = Quat::from_rotation_z(time.delta_seconds() as f32 * 2.0);
+//             // transform.scale = scale;
+//             transform.rotate(rot_x * rot_y * rot_z);
+//         }
+//     });
+// }

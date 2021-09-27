@@ -566,6 +566,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_rng"
+version = "0.3.1"
+source = "git+https://github.com/dylanrenwick/bevy_rng?branch=main#82bb2b5f4f88143665357fce2075f3cac88acb0a"
+dependencies = [
+ "bevy",
+ "rand",
+ "rand_seeder",
+ "rand_xoshiro",
+]
+
+[[package]]
 name = "bevy_scene"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1437,6 +1448,7 @@ dependencies = [
  "bevy",
  "bevy_frustum_culling",
  "bevy_mod_bounding",
+ "bevy_rng",
  "bevycheck",
  "futures-lite",
  "num_cpus",
@@ -2732,6 +2744,24 @@ name = "rand_hc"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d51e9f596de227fda2ea6c84607f5558e196eeaf43c986b724ba4fb8fdf497e7"
+dependencies = [
+ "rand_core",
+]
+
+[[package]]
+name = "rand_seeder"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "612dd698949d531335b4c29d1c64fb11942798decfc08abc218578942e66d7d0"
+dependencies = [
+ "rand_core",
+]
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
 dependencies = [
  "rand_core",
 ]
