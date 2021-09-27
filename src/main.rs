@@ -3,6 +3,10 @@
 #[macro_use] extern crate serde;
 extern crate bevy_mod_bounding;
 extern crate bevy_frustum_culling;
+extern crate rayon;
+extern crate num_cpus;
+
+use rayon::prelude::*;
 
 use std::collections::HashMap;
 use std::fs;
@@ -14,7 +18,7 @@ use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::reflect::{TypeUuid, TypeUuidDynamic, Uuid};
 use bevy::render::colorspace::HslRepresentation;
-use bevy::tasks::{AsyncComputeTaskPool, Task};
+use bevy::tasks::{AsyncComputeTaskPool, ComputeTaskPool, Task, TaskPool};
 use bevy::pbr::*;
 use bevy_frustum_culling::Bounded;
 use constants::{CHUNK_SIZE, CHUNK_SIZE_CUBE};
@@ -34,6 +38,7 @@ fn main() {
 
 
         .add_plugin(bevy_frustum_culling::BoundingVolumePlugin::<bevy_frustum_culling::aabb::Aabb>::default())
+        .add_plugin(bevy_frustum_culling::FrustumCullingPlugin::<bevy_frustum_culling::aabb::Aabb>::default())
 
         //Camera
         .add_startup_system(camera::setup_camera.system())
@@ -276,14 +281,15 @@ fn handle_tasks<'a>(
                 let mut mat: Option<&StandardMaterial> = None;
                 unsafe {
                     if let Some(mm) = &material_mappings {
-                        println!("pbr_id: {:?}", voxel.pbr_id);
+                        // println!("pbr_id: {:?}", voxel.pbr_id);
                         mat = mm.get(&voxel.pbr_id);
                     }
                 }
 
                 if let Some(m) = mat {
                     commands
-                        .spawn_bundle(PbrBundle {
+                        .spawn()
+                        .insert_bundle(PbrBundle {
                             visible: Visible {
                                 is_visible: true,
                                 is_transparent: false,
@@ -296,9 +302,9 @@ fn handle_tasks<'a>(
                             transform: Transform::from_translation(voxel.position),
                             ..Default::default()
                         })
-                        .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
-                        // .insert(Bounded::<bevy_frustum_culling::sphere::BSphere>::default())
-                        .insert(bevy_frustum_culling::debug::DebugBounds)
+                        .insert(bevy_frustum_culling::aabb::Aabb::default())
+                        // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
+                        // .insert(bevy_frustum_culling::debug::DebugBounds)
                         .insert(Rotator);
                 }
             }
@@ -319,17 +325,20 @@ fn setup_env(mut commands: Commands) {
 
 struct Rotator;
 /// Rotate the meshes to demonstrate how the bounding volumes update
-fn rotation_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
-    query.for_each_mut(|mut transform| {
-        // println!("{:?}", transform.visible.is_visible);
-        // let scale = ::ONE * ((time.seconds_since_startup() as f32).sin() * 0.3 + 1.0) * 0.3;
-        let rot_x = Quat::from_rotation_x(time.delta_seconds() as f32 * 5.0);
-        let rot_y = Quat::from_rotation_y(time.delta_seconds() as f32 * 3.0);
-        let rot_z = Quat::from_rotation_z(time.delta_seconds() as f32 * 2.0);
-        // transform.scale = scale;
-        transform.rotate(rot_x * rot_y * rot_z);
+fn rotation_system(
+        time: Res<Time>,
+        thread_pool: Res<ComputeTaskPool>,
+        mut query: Query<(&mut Transform, Option<&Visible>), With<Rotator>>
+    ) {
+    // let tp = TaskPool::new();
+    query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut transform, visible)| {
+        if visible.is_some() && visible.unwrap().is_visible {
+            // let scale = ::ONE * ((time.seconds_since_startup() as f32).sin() * 0.3 + 1.0) * 0.3;
+            let rot_x = Quat::from_rotation_x(time.delta_seconds() as f32 * 5.0);
+            let rot_y = Quat::from_rotation_y(time.delta_seconds() as f32 * 3.0);
+            let rot_z = Quat::from_rotation_z(time.delta_seconds() as f32 * 2.0);
+            // transform.scale = scale;
+            transform.rotate(rot_x * rot_y * rot_z);
+        }
     });
-    // for mut transform in query.iter_mut() { //.filter(|x| x.visible.is_visible)
-       
-    // }
 }
