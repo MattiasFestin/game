@@ -1,9 +1,9 @@
-pub const CHUNK_SIZE: usize = 5;
+pub const CHUNK_SIZE: usize = 2;
 pub const CHUNK_SIZE_CUBE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 pub const MIN_FORCE: f32 = 0.01;
 pub const MIN_VELOCITY: f32 = 0.01;
-pub const MAX_MASS: f32 = GRAVITY_MIN_MASS_PROD;
+pub const MAX_MASS: f32 = 1.0e32;
 pub const MAX_SPEED: f32 = PHYSICS_C * 0.1;
 // pub const MAX_MASS: f32 = 5.9673e27;
 

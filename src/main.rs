@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 #[macro_use] extern crate bevy;
 #[macro_use] extern crate bevycheck;
 #[macro_use] extern crate serde;
@@ -6,8 +8,10 @@ extern crate bevy_frustum_culling;
 extern crate rayon;
 extern crate num_cpus;
 extern crate bevy_rng;
+extern crate core_simd;
 
 use bevy::core::FixedTimestep;
+use bevy::math::Vec3A;
 use bevy_rng::Rng;
 use rayon::prelude::*;
 
@@ -33,6 +37,7 @@ mod constants;
 mod camera;
 mod input;
 mod physics;
+mod noise;
 
 fn main() {
     App::build()
@@ -42,9 +47,6 @@ fn main() {
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(RngPlugin::from(42))
-
-        .add_plugin(bevy_frustum_culling::BoundingVolumePlugin::<bevy_frustum_culling::aabb::Aabb>::default())
-        .add_plugin(bevy_frustum_culling::FrustumCullingPlugin::<bevy_frustum_culling::aabb::Aabb>::default())
 
         //Camera
         .add_startup_system(camera::setup_camera.system())
@@ -68,6 +70,7 @@ fn main() {
             .with_system(physics::velocity.system().label(physics::PhysicsSystem::Velocity).after(physics::PhysicsSystem::Force))
             .with_system(physics::force.system().label(physics::PhysicsSystem::Force))
             .with_system(physics::gravity.system().label(physics::PhysicsSystem::Gravity).before(physics::PhysicsSystem::Force))
+            .with_system(physics::collition.system().after(physics::PhysicsSystem::Position))
         )
 
         //Start game
@@ -137,7 +140,7 @@ fn add_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>
 ) {
-    let box_mesh_handle = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
+    let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Icosphere { radius: 0.5, subdivisions: 32 }));
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
 
 
@@ -169,22 +172,11 @@ fn spawn_tasks(
         mut commands: Commands,
         thread_pool: Res<AsyncComputeTaskPool>
     ) {
-    //TODO: Spawn in new chunks
-    // let chunk = VoxelChunk::default();
+    let task = thread_pool.spawn(async move {
+        return VoxelChunk::default();
+    });
 
-    // for voxel in chunk.voxels {
-        let task = thread_pool.spawn(async move {
-            // let mut v= voxel.clone();
-            // // v.pbr_id = Some(HandleId::new(
-            // //     Uuid::from_str("2642b340-7267-4b72-8af7-bb4f279508dd").unwrap(), 
-            // //     2
-            // // ));
-            return VoxelChunk::default();
-        });
-
-        // Spawn new entity and add our new task as a component
-        commands.spawn().insert(task);
-    // }
+    commands.spawn().insert(task);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -329,20 +321,23 @@ fn handle_tasks<'a>(
                         })
                         .insert(bevy_frustum_culling::aabb::Aabb::default())
                         .insert(physics::Position {
-                            position: voxel.position
+                            position: voxel.position.into()
                         })
                         .insert(physics::Velocity {
-                            velocity: Vec3::ZERO,
+                            velocity: Vec3A::ZERO,
                         })
                         .insert(physics::Force {
-                            force: Vec3::new(rng.gen::<f32>()* - 0.5, rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5),
+                            force: Vec3A::new(rng.gen::<f32>()* - 0.5, rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5),
                             is_dirty: true
                         })
                         .insert( physics::Mass {
-                            mass: 125000000.0,//rng.gen::<f32>()*10.0,
+                            mass: 125000000000.0,//rng.gen::<f32>()*10.0,
                         })
                         .insert(physics::Identity {
                             id: voxel.id
+                        })
+                        .insert(physics::InelasticCollision {
+                            cor: 0.75
                         })
                         // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
                         // .insert(bevy_frustum_culling::debug::DebugBounds)

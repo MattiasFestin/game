@@ -16,6 +16,9 @@ toml = "0.5"
 rayon = "1.5"
 num_cpus = "1.13"
 bevy_rng = { git="https://github.com/dylanrenwick/bevy_rng", branch="main" }
+bevy_world_to_screenspace = { git="https://github.com/aevyrie/bevy_world_to_screenspace.git", branch="master" }
+bevy_rapier3d = { version = "*", features = [ "simd-stable" ] }
+core_simd = { git = "https://github.com/rust-lang/portable-simd" }
 
 [profile.dev.package."*"]
 opt-level = 3

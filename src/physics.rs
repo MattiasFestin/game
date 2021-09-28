@@ -3,8 +3,10 @@ use std::cell::RefCell;
 use std::ops::Mul;
 use std::rc::Rc;
 
+use bevy::math::Vec3A;
 use bevy::prelude::*;
-use bevy::tasks::{AsyncComputeTaskPool, ComputeTaskPool};
+use bevy::tasks::{ComputeTaskPool};
+use bevy_frustum_culling::aabb::Aabb;
 // use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use rayon::prelude::*;
 
@@ -24,24 +26,25 @@ pub struct Identity {
 }
 
 pub struct Position {
-    pub position: Vec3,
+    pub position: Vec3A,
 }
+
 pub fn position(
-    thread_pool: Res<AsyncComputeTaskPool>,
+    thread_pool: Res<ComputeTaskPool>,
     mut query: Query<(&mut Transform, &mut Position), Changed<Position>>
 ) {
     query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut transform, mut p)| {
-        transform.translation = p.position;
+        transform.translation = p.position.into();
     });
 }
 
 pub struct Velocity {
-    pub velocity: Vec3,
+    pub velocity: Vec3A,
 }
 
 pub fn velocity(
     time: Res<Time>,
-    thread_pool: Res<AsyncComputeTaskPool>,
+    thread_pool: Res<ComputeTaskPool>,
     mut query: Query<(&mut Position, &mut Velocity), (With<Position>, With<Velocity>)>
 ) {
     query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut p, mut v)| {
@@ -56,7 +59,7 @@ pub struct Mass {
 }
 
 pub struct Force {
-    pub force: Vec3,
+    pub force: Vec3A,
     pub is_dirty: bool,
 }
 
@@ -74,7 +77,7 @@ pub fn force(
 
 pub fn gravity(
     time: Res<Time>,
-    thread_pool: Res<AsyncComputeTaskPool>,
+    thread_pool: Res<ComputeTaskPool>,
     // mut query: Query<(&mut &Force, &Mass, &Position), (With<Force>, With<Mass>, With<Position>)>
     mut set: QuerySet<(
         Query<(&Mass, &Position, &Identity), (With<Mass>, With<Position>, With<Identity>)>,
@@ -82,7 +85,6 @@ pub fn gravity(
     )>
 ) {
     let mut heavy = Vec::new();
-    // let mut b = Rc::new(RefCell::new(Vec::new()));
     {
         set.q0().for_each_mut(|(m,p, i)| {
             if m.mass > crate::constants::GRAVITY_MIN_MASS {
@@ -91,9 +93,6 @@ pub fn gravity(
         });
     }
 
-    
-//     // let mut b = Vec::new();
-    // set.q1_mut().for_each_mut(|(mut f1, m2, p2, i2)| {
     set.q1_mut().par_for_each_mut(&thread_pool, num_cpus::get(), |(mut f2, mut m2, p2, i2)| {
         heavy.clone().into_iter().for_each(|(m1, p1, i1)| {
             let mass_prod = m1 * m2.mass;
@@ -108,56 +107,45 @@ pub fn gravity(
 
                     f2.is_dirty = true;
                     f2.force += m * d * time.delta_seconds();
-                    // m2.mass *= 1.01;
                 }
-                // println!("{:?} => {:?} * {:?} * {:?} / {:?} = {:?}", i2.id, m1, m2.mass, crate::constants::PHYSICS_GRAVITY, r2, m);
             }
         });
     });
-    
-    // for (m1, p1, i1) in {
-    //     // let (m1, p1, i1) = &*el.borrow_mut();
-    //     // for el2 in a.into_iter() {
+}
 
-    //     // }
-    // }
-    // for (mut f1, m1, p1, i1) in query.iter_mut() {
-    //     let b: Vec<Rc<RefCell<(Mut<Force>, &Mass, &Position, &Identity)>> = a.borrow();
-    //     for (mut f2, m2, p2, i2) in b.into_iter() {
+pub struct InelasticCollision {
+    pub cor: f32 // coefficient of restitution
+}
 
-    //     }
-    // }
-    // for (m2, p2, i2) in set.q1().iter() {
-//             if i1.id != i2.id && m1.mass + m2.mass > crate::constants::MIN_MASS && m1.mass > m2.mass {
-//                 println!("Gravity: ({:?}, {:?})", i1.id, i2.id);
-//                 let r2 = p1.position.distance_squared(p2.position);
-//                 let m = m1.mass * m2.mass * crate::constants::PHYSICS_GRAVITY / r2;
-//                 let d = (p1.position - p2.position).normalize();
+pub fn collition(
+    thread_pool: Res<ComputeTaskPool>,
+    mut set: QuerySet<(
+        Query<(&Velocity, &Mass, &Position, &Identity, &InelasticCollision), (With<Mass>, With<Velocity>, With<Position>, With<Identity>, With<InelasticCollision>)>,
+        Query<(&mut Velocity, &Mass, &Position, &Identity, &InelasticCollision), (With<Velocity>, With<Position>, With<Identity>, With<InelasticCollision>)>,
+        // Query<(&bevy_frustum_culling::aabb::Aabb, &Identity), (With<bevy_frustum_culling::aabb::Aabb>, With<Identity>)>,
+        // Query<(&mut Position, &bevy_frustum_culling::aabb::Aabb, &Identity), (&mut Position, With<bevy_frustum_culling::aabb::Aabb>, With<Identity>)>
+    )>
+) {
+    let mut coliders = Vec::new();
+    {
+        set.q0().for_each_mut(|(v, m, p, i, ic)| {
+            coliders.push((v.velocity, m.mass, p.position.clone(), i.id, ic.cor));
+        });
+    }
 
-//                 f1.is_dirty = true;
-//                 f1.force = m * d;
+    set.q1_mut().par_for_each_mut(&thread_pool, num_cpus::get(), |(mut v2, m2, p2, i2, ic2)| {
+        coliders.clone().into_iter().for_each(|(v1, m1, p1, i1, ic1)| {
+            if i1 != i2.id && p1.distance(p2.position) < 1.0 {
+                let u1 = m1 * v1;
+                let u2 = m2.mass * v2.velocity;
+                let mt = m1 + m2.mass;
+                let pd = p1-p2.position;
+                let dot = (v2.velocity-v1).dot(pd);
+                let ic = ic1 * ic2.cor;
 
-//                 // f2.is_dirty = true;
-//                 // f2.force = -m * d;
-//             }
-//         }
-//     }
-    // query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut f1, m1, p1, i1)| {
-        
-    // });
-//     //     // q2.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut f2, m2, p2, i2)| {
-//     //     //     if i1.id != i2.id && m1.mass + m2.mass > crate::constants::MIN_MASS {
-                
-//     //     //     }
-//     //     // });
-//     //     // q2;
-//     // });
-
-//     // a.par_iter().enumerate().for_each(|(i, (mut f1, m1, p1))| {
-//     //     b.par_iter().enumerate().for_each(|(j, (mut f2, m2, p2))| {
-//     //         if i != j && m1.mass + m2.mass > crate::constants::MIN_MASS {
-                
-//     //         }
-//     //     });
-//     // });
+                //TEST
+                v2.velocity -=  ic * 2.0*m1 / mt * dot/p1.distance_squared(p2.position) * pd;
+            }
+        });
+    });
 }
