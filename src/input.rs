@@ -1,4 +1,4 @@
-use std::ops::Mul;
+
 
 use bevy::prelude::*;
 use bevy::utils::HashSet;
@@ -30,7 +30,7 @@ pub fn connection_system(
 
 pub fn gamepad_system(
     lobby: Res<GamepadLobby>,
-    button_inputs: Res<Input<GamepadButton>>,
+    _button_inputs: Res<Input<GamepadButton>>,
     button_axes: Res<Axis<GamepadButton>>,
     axes: Res<Axis<GamepadAxis>>,
     time: Res<Time>,
@@ -74,24 +74,24 @@ pub fn gamepad_system(
             info!("{:?} LeftStickX value is {}", gamepad, left_stick_y);
         }
 
-        let mut rightTrigger = button_axes
+        let mut right_trigger = button_axes
             .get(GamepadButton(gamepad, GamepadButtonType::RightTrigger2))
             .unwrap();
-        if rightTrigger.abs() < 0.1 {
-            rightTrigger = 0.0f32;
+        if right_trigger.abs() < 0.1 {
+            right_trigger = 0.0f32;
         } else {
-            info!("{:?} RightTrigger2 value is {}", gamepad, rightTrigger);
+            info!("{:?} RightTrigger2 value is {}", gamepad, right_trigger);
         }
-        let mut leftTrigger = button_axes
+        let mut left_trigger = button_axes
             .get(GamepadButton(gamepad, GamepadButtonType::LeftTrigger2))
             .unwrap();
-        if leftTrigger.abs() < 0.1 {
-            leftTrigger = 0.0f32;
+        if left_trigger.abs() < 0.1 {
+            left_trigger = 0.0f32;
         } else {
-            info!("{:?} LeftTrigger2 value is {}", gamepad, leftTrigger);
+            info!("{:?} LeftTrigger2 value is {}", gamepad, left_trigger);
         }
 
-        let zp = rightTrigger - leftTrigger;
+        let zp = right_trigger - left_trigger;
 
         match camera_query.single_mut() {
             Ok(mut transform) => {

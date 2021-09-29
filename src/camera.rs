@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use bevy::prelude::shape::Quad;
-use bevy::render::camera::PerspectiveProjection;
+
+
 use bevy::{math::Vec3};
 use bevy_frustum_culling::FrustumCulling;
 

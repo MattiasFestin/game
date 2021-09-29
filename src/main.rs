@@ -1,31 +1,33 @@
-#![feature(portable_simd)]
+#![allow(dead_code)]
 
-#[macro_use] extern crate bevy;
-#[macro_use] extern crate bevycheck;
+#![feature(portable_simd)]
+#![feature(test)]
+
+extern crate bevy;
+// #[macro_use] extern crate bevycheck;
 #[macro_use] extern crate serde;
 extern crate bevy_mod_bounding;
 extern crate bevy_frustum_culling;
+// extern crate bevy_world_to_screenspace;
 extern crate rayon;
 extern crate num_cpus;
 extern crate bevy_rng;
 extern crate core_simd;
+extern crate simdnoise;
 
-use bevy::core::FixedTimestep;
-use bevy::math::Vec3A;
 use bevy_rng::Rng;
-use rayon::prelude::*;
 
 use std::collections::HashMap;
 use std::fs;
 
-use bevy::asset::HandleId;
+
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
-use bevy::reflect::{TypeUuid, TypeUuidDynamic, Uuid};
-use bevy::render::colorspace::HslRepresentation;
-use bevy::tasks::{AsyncComputeTaskPool, ComputeTaskPool, Task, TaskPool};
-use bevy::pbr::*;
-use bevy_frustum_culling::Bounded;
+use bevy::reflect::{TypeUuidDynamic, Uuid};
+
+use bevy::tasks::{AsyncComputeTaskPool, Task};
+
+
 use constants::{CHUNK_SIZE, CHUNK_SIZE_CUBE};
 use futures_lite::future;
 
@@ -137,8 +139,8 @@ struct BoxMeshHandle(Handle<Mesh>);
 //     map: HashMap<u64, PbrConfig>
 // }
 
-static mut material_mappings: Option<HashMap<u64, StandardMaterial>> = None;
-static mut number_of_materials: u64 = 0;
+static mut MATERIAL_MAPPINGS: Option<HashMap<u64, StandardMaterial>> = None;
+static mut NUMBER_OF_MATERIALS: u64 = 0;
 
 
 fn add_assets(
@@ -155,14 +157,14 @@ fn add_assets(
 
     let dict: HashMap<String, PbrConfig> = toml::from_str(&contents).unwrap();
     let mut map = HashMap::new();
-    for (k, v) in dict {
+    for (_k, v) in dict {
         map.insert(v.id, v.pbr());
     }
 
     let count = map.keys().count() as u64;
     unsafe {
-        material_mappings = Some(map);
-        number_of_materials = count;
+        MATERIAL_MAPPINGS = Some(map);
+        NUMBER_OF_MATERIALS = count;
     }
 }
 
@@ -172,7 +174,7 @@ fn spawn_tasks(
     ) {
     let task = thread_pool.spawn(async move {
         unsafe {
-            while number_of_materials == 0 {
+            while NUMBER_OF_MATERIALS == 0 {
                 println!("waiting...");
                 future::yield_now().await;
             }
@@ -183,7 +185,7 @@ fn spawn_tasks(
             Voxel {
                 id: x.id,
                 position: x.position,
-                pbr_id: unsafe { noise::noise_1d(x.id, 54) % number_of_materials },
+                pbr_id: unsafe { noise::noise_1d(x.id, 54) % NUMBER_OF_MATERIALS },
             }
         }).collect();
         chunk.voxels = tmp;
@@ -293,11 +295,11 @@ impl PbrConfig {
 
 fn handle_tasks<'a>(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
+    _meshes: ResMut<Assets<Mesh>>,
     mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     box_mesh_handle: Res<BoxMeshHandle>,
-    mut rng: Local<Rng>
+    _rng: Local<Rng>
 ) {
     for (entity, mut task) in voxel_chunk_tasks.iter_mut() {
         if let Some(voxel_chunk) = future::block_on(future::poll_once(&mut *task)) {
@@ -306,7 +308,7 @@ fn handle_tasks<'a>(
 
                 let mut mat: Option<&StandardMaterial> = None;
                 unsafe {
-                    if let Some(mm) = &material_mappings {
+                    if let Some(mm) = &MATERIAL_MAPPINGS {
                         mat = mm.get(&voxel.pbr_id);
                     }
                 }

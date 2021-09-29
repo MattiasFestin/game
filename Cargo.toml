@@ -6,7 +6,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.5.0" } #, features = ["dynamic"]
+bevy = { version = "0.5.0", features = ["dynamic"] } 
 bevycheck = "0.1"
 bevy_mod_bounding = "0.1"
 bevy_frustum_culling = { git="https://github.com/aevyrie/bevy_frustum_culling.git", branch="master" }
@@ -16,7 +16,7 @@ toml = "0.5"
 rayon = "1.5"
 num_cpus = "1.13"
 bevy_rng = { git="https://github.com/dylanrenwick/bevy_rng", branch="main" }
-bevy_world_to_screenspace = { git="https://github.com/aevyrie/bevy_world_to_screenspace.git", branch="master" }
+# bevy_world_to_screenspace = { git="https://github.com/aevyrie/bevy_world_to_screenspace.git", branch="master" }
 bevy_rapier3d = { version = "*", features = [ "simd-stable", "render" ] }
 core_simd = { git = "https://github.com/rust-lang/portable-simd" }
 simdnoise = "3.1"
