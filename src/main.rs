@@ -17,8 +17,6 @@ use rayon::prelude::*;
 
 use std::collections::HashMap;
 use std::fs;
-use std::ops::Add;
-use std::str::FromStr;
 
 use bevy::asset::HandleId;
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
@@ -46,7 +44,11 @@ fn main() {
 
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(RngPlugin::from(42))
+        .add_plugin(RngPlugin::from(42)) //TODO: Seed
+        .add_plugin(bevy_rapier3d::render::RapierRenderPlugin)
+
+        .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<bevy_rapier3d::physics::NoUserData>::default())
+        // .add_startup_system(setup_physics.system())
 
         //Camera
         .add_startup_system(camera::setup_camera.system())
@@ -63,15 +65,17 @@ fn main() {
         // .add_system(rotation_system.system())
         .add_system(handle_tasks.system())
 
-        .add_system(physics::position.system().label(physics::PhysicsSystem::Position).after(physics::PhysicsSystem::Velocity))
-        .add_system_set(SystemSet::new()
-            .label(physics::Physics)
-            .with_run_criteria(FixedTimestep::step(constants::PHYSICS_TICKS))
-            .with_system(physics::velocity.system().label(physics::PhysicsSystem::Velocity).after(physics::PhysicsSystem::Force))
-            .with_system(physics::force.system().label(physics::PhysicsSystem::Force))
-            .with_system(physics::gravity.system().label(physics::PhysicsSystem::Gravity).before(physics::PhysicsSystem::Force))
-            .with_system(physics::collition.system().after(physics::PhysicsSystem::Position))
-        )
+        // .add_system(print_ball_altitude.system())
+
+        // .add_system(physics::position.system().label(physics::PhysicsSystem::Position).after(physics::PhysicsSystem::Velocity))
+        // .add_system_set(SystemSet::new()
+        //     .label(physics::Physics)
+        //     .with_run_criteria(FixedTimestep::step(constants::PHYSICS_TICKS))
+        //     .with_system(physics::velocity.system().label(physics::PhysicsSystem::Velocity).after(physics::PhysicsSystem::Force))
+        //     .with_system(physics::force.system().label(physics::PhysicsSystem::Force))
+        //     .with_system(physics::gravity.system().label(physics::PhysicsSystem::Gravity).before(physics::PhysicsSystem::Force))
+        //     .with_system(physics::collition.system().after(physics::PhysicsSystem::Position))
+        // )
 
         //Start game
         .run();
@@ -113,11 +117,11 @@ impl Default for VoxelChunk {
                 let z = rest % CHUNK_SIZE;
 
 
-                let position = 10.0*Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
+                let position = 2.0*Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
                 Voxel {
                     id: index as u64,
                     position,
-                    pbr_id: ((x + y + z) % 2) as u64 + 1
+                    ..Default::default()
                 }
             }).collect() 
         }
@@ -134,13 +138,14 @@ struct BoxMeshHandle(Handle<Mesh>);
 // }
 
 static mut material_mappings: Option<HashMap<u64, StandardMaterial>> = None;
+static mut number_of_materials: u64 = 0;
 
 
 fn add_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>
 ) {
-    let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Icosphere { radius: 0.5, subdivisions: 32 }));
+    let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Icosphere { radius: 1.0, subdivisions: 32 }));
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
 
 
@@ -152,19 +157,12 @@ fn add_assets(
     let mut map = HashMap::new();
     for (k, v) in dict {
         map.insert(v.id, v.pbr());
-        // let material_id = HandleId::new(v.uuid, v.id);
-        // let handle = Handle::<StandardMaterial>::weak(material_id);
-    
-        //TODO: Ref
-        // materials.add(v.pbr());
-    //     let pbr = v.pbr();
-    //     if materials.get(handle.clone()).is_none() {
-    //         materials.set_untracked(handle.clone(), pbr);
-    //     }
     }
 
+    let count = map.keys().count() as u64;
     unsafe {
         material_mappings = Some(map);
+        number_of_materials = count;
     }
 }
 
@@ -173,7 +171,23 @@ fn spawn_tasks(
         thread_pool: Res<AsyncComputeTaskPool>
     ) {
     let task = thread_pool.spawn(async move {
-        return VoxelChunk::default();
+        unsafe {
+            while number_of_materials == 0 {
+                println!("waiting...");
+                future::yield_now().await;
+            }
+        }
+
+        let mut chunk = VoxelChunk::default();
+        let tmp: Vec<Voxel> = chunk.voxels.iter().map(|x| {
+            Voxel {
+                id: x.id,
+                position: x.position,
+                pbr_id: unsafe { noise::noise_1d(x.id, 54) % number_of_materials },
+            }
+        }).collect();
+        chunk.voxels = tmp;
+        return chunk;
     });
 
     commands.spawn().insert(task);
@@ -279,6 +293,7 @@ impl PbrConfig {
 
 fn handle_tasks<'a>(
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     box_mesh_handle: Res<BoxMeshHandle>,
@@ -292,7 +307,6 @@ fn handle_tasks<'a>(
                 let mut mat: Option<&StandardMaterial> = None;
                 unsafe {
                     if let Some(mm) = &material_mappings {
-                        // println!("pbr_id: {:?}", voxel.pbr_id);
                         mat = mm.get(&voxel.pbr_id);
                     }
                 }
@@ -320,25 +334,46 @@ fn handle_tasks<'a>(
                             ..Default::default()
                         })
                         .insert(bevy_frustum_culling::aabb::Aabb::default())
-                        .insert(physics::Position {
-                            position: voxel.position.into()
+                        .insert_bundle(bevy_rapier3d::physics::RigidBodyBundle {
+                            position: voxel.position.into(),
+                            velocity: bevy_rapier3d::prelude::RigidBodyVelocity { 
+                                linvel: Vec3::ZERO.into(),//(-1.0 * voxel.position).into(), 
+                                angvel: Vec3::ZERO.into()
+                            },
+                            forces: bevy_rapier3d::prelude::RigidBodyForces { gravity_scale: 1.0, ..Default::default() },
+                            activation: bevy_rapier3d::prelude::RigidBodyActivation::cannot_sleep(),
+                            ccd: bevy_rapier3d::prelude::RigidBodyCcd { ccd_enabled: true, ..Default::default() },
+                            ..Default::default()
                         })
-                        .insert(physics::Velocity {
-                            velocity: Vec3A::ZERO,
+                        .insert_bundle(bevy_rapier3d::physics::ColliderBundle {
+                            shape: bevy_rapier3d::prelude::ColliderShape::ball(1.0),
+                            collider_type: bevy_rapier3d::prelude::ColliderType::Sensor,
+                            position: (Vec3::new(2.0, 0.0, 3.0), Quat::from_rotation_x(0.4)).into(),
+                            material: bevy_rapier3d::prelude::ColliderMaterial { friction: 0.7, restitution: 0.3, ..Default::default() },
+                            mass_properties: bevy_rapier3d::prelude::ColliderMassProps::Density(2.0),
+                            ..Default::default()
                         })
-                        .insert(physics::Force {
-                            force: Vec3A::new(rng.gen::<f32>()* - 0.5, rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5),
-                            is_dirty: true
-                        })
-                        .insert( physics::Mass {
-                            mass: 125000000000.0,//rng.gen::<f32>()*10.0,
-                        })
-                        .insert(physics::Identity {
-                            id: voxel.id
-                        })
-                        .insert(physics::InelasticCollision {
-                            cor: 0.75
-                        })
+                        .insert(Transform::default())
+                        .insert(bevy_rapier3d::physics::RigidBodyPositionSync::Discrete)
+                        // .insert(physics::Position {
+                        //     position: voxel.position.into()
+                        // })
+                        // .insert(physics::Velocity {
+                        //     velocity: Vec3A::ZERO,
+                        // })
+                        // .insert(physics::Force {
+                        //     force: Vec3A::new(rng.gen::<f32>()* - 0.5, rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5),
+                        //     is_dirty: true
+                        // })
+                        // .insert( physics::Mass {
+                        //     mass: 125000000000.0,//rng.gen::<f32>()*10.0,
+                        // })
+                        // .insert(physics::Identity {
+                        //     id: voxel.id
+                        // })
+                        // .insert(physics::InelasticCollision {
+                        //     cor: 0.75
+                        // })
                         // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
                         // .insert(bevy_frustum_culling::debug::DebugBounds)
                         ;
@@ -420,6 +455,30 @@ fn handle_tasks<'a>(
                 //         // .insert(bevy_frustum_culling::debug::DebugBounds)
                 //         ;
 
+                // let collider = bevy_rapier3d::physics::ColliderBundle {
+                //     shape: bevy_rapier3d::prelude::ColliderShape::cuboid(100.0, 0.1, 100.0),
+                //     ..Default::default()
+                // };
+                // commands.spawn_bundle(collider);
+            
+                // /* Create the bouncing ball. */
+                // let rigid_body = bevy_rapier3d::physics::RigidBodyBundle {
+                //     position: Vec3::new(0.0, 10.0, 0.0).into(),
+                //     ..Default::default()
+                // };
+                // let collider = bevy_rapier3d::physics::ColliderBundle {
+                //     shape: bevy_rapier3d::prelude::ColliderShape::ball(0.5),
+                //     material: bevy_rapier3d::prelude::ColliderMaterial {
+                //         restitution: 0.7,
+                //         ..Default::default()
+                //     },
+                //     ..Default::default()
+                // };
+                // commands.spawn_bundle(rigid_body)
+                //     .insert_bundle(collider)
+                //     .insert(bevy_rapier3d::physics::ColliderPositionSync::Discrete)
+                //     .insert(bevy_rapier3d::render::ColliderDebugRender::with_id(1));
+
             // Task is complete, so remove task component from entity
             commands.entity(entity).remove::<Task<VoxelChunk>>();
         }
@@ -452,4 +511,10 @@ fn setup_env(mut commands: Commands) {
 //             transform.rotate(rot_x * rot_y * rot_z);
 //         }
 //     });
+// }
+
+// fn print_ball_altitude(positions: Query<&bevy_rapier3d::prelude::RigidBodyPosition>) {
+//     for rb_pos in positions.iter() {
+//         println!("Ball altitude: {}", rb_pos.position.translation.vector.y);
+//     }
 // }

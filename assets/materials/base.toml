@@ -1,5 +1,5 @@
 [red]
-id = 1
+id = 0
 uuid = "2642b340-7267-4b72-8af7-bb4f279508dd"
 unlit = false
 color = [ 255, 255, 255 ]
@@ -10,7 +10,7 @@ reflectance = 0
 
 
 [green]
-id = 2
+id = 1
 uuid = "2642b340-7267-4b72-8af7-bb4f279508dd"
 unlit = false
 color = [ 128, 128, 128 ]
