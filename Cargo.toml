@@ -20,6 +20,7 @@ bevy_rng = { git="https://github.com/dylanrenwick/bevy_rng", branch="main" }
 bevy_rapier3d = { version = "*", features = [ "simd-stable", "render" ] }
 core_simd = { git = "https://github.com/rust-lang/portable-simd" }
 simdnoise = "3.1"
+rand = "0.8"
 
 [profile.dev.package."*"]
 opt-level = 3

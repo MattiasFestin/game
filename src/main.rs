@@ -14,6 +14,7 @@ extern crate num_cpus;
 extern crate bevy_rng;
 extern crate core_simd;
 extern crate simdnoise;
+extern crate rand;
 
 use bevy_rng::Rng;
 
@@ -38,6 +39,7 @@ mod camera;
 mod input;
 mod physics;
 mod noise;
+mod state;
 
 fn main() {
     App::build()
@@ -108,24 +110,25 @@ impl Default for VoxelChunk {
     fn default() -> Self {
         Self { 
             position: Vec3::ZERO,
-            voxels: (1..CHUNK_SIZE_CUBE).into_iter().map(|index| {
-                let rest = index;
-                let x = rest % CHUNK_SIZE;
+            voxels: Vec::new()
+            // (1..CHUNK_SIZE_CUBE).into_iter().map(|index| {
+            //     let rest = index;
+            //     let x = rest % CHUNK_SIZE;
 
-                let rest = (rest - x) / CHUNK_SIZE;
-                let y = rest % CHUNK_SIZE;
+            //     let rest = (rest - x) / CHUNK_SIZE;
+            //     let y = rest % CHUNK_SIZE;
 
-                let rest = (rest - y) / CHUNK_SIZE;
-                let z = rest % CHUNK_SIZE;
+            //     let rest = (rest - y) / CHUNK_SIZE;
+            //     let z = rest % CHUNK_SIZE;
 
-
-                let position = 2.0*Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
-                Voxel {
-                    id: index as u64,
-                    position,
-                    ..Default::default()
-                }
-            }).collect() 
+            //     println!("{:?},{:?},{:?}", x, y, z);
+            //     let position = Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
+            //     Voxel {
+            //         id: index as u64,
+            //         position,
+            //         ..Default::default()
+            //     }
+            // }).collect() 
         }
     }
 }
@@ -147,7 +150,7 @@ fn add_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>
 ) {
-    let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Icosphere { radius: 1.0, subdivisions: 32 }));
+    let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 1.0 }));
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
 
 
@@ -170,8 +173,10 @@ fn add_assets(
 
 fn spawn_tasks(
         mut commands: Commands,
-        thread_pool: Res<AsyncComputeTaskPool>
+        thread_pool: Res<AsyncComputeTaskPool>,
+        state: Local<crate::state::GameState>
     ) {
+    let seed = state.seed;
     let task = thread_pool.spawn(async move {
         unsafe {
             while NUMBER_OF_MATERIALS == 0 {
@@ -180,15 +185,29 @@ fn spawn_tasks(
             }
         }
 
+        let hightmap = simdnoise::NoiseBuilder::fbm_2d(crate::constants::CHUNK_SIZE, crate::constants::CHUNK_SIZE)
+            .with_seed(seed as i32)
+            .generate_scaled(0.0, unsafe {NUMBER_OF_MATERIALS as f32 });
+
+        let cs = crate::constants::CHUNK_SIZE as f32;
+
         let mut chunk = VoxelChunk::default();
-        let tmp: Vec<Voxel> = chunk.voxels.iter().map(|x| {
-            Voxel {
-                id: x.id,
-                position: x.position,
-                pbr_id: unsafe { noise::noise_1d(x.id, 54) % NUMBER_OF_MATERIALS },
+        for x in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
+                let y_index = x + z * CHUNK_SIZE;
+                let max_y = (hightmap[y_index] * cs).floor() as usize;
+
+                for y in 0..max_y {
+                    let index = (x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE) as u64;
+                    chunk.voxels.push(Voxel {
+                        id: noise::noise_1d(index, seed),
+                        position: Vec3::new(x as f32, y as f32, z as f32),
+                        pbr_id: unsafe { noise::noise_1d(index, seed) % NUMBER_OF_MATERIALS },
+                    });
+                }
             }
-        }).collect();
-        chunk.voxels = tmp;
+        }
+
         return chunk;
     });
 
@@ -339,11 +358,11 @@ fn handle_tasks<'a>(
                         .insert_bundle(bevy_rapier3d::physics::RigidBodyBundle {
                             position: voxel.position.into(),
                             velocity: bevy_rapier3d::prelude::RigidBodyVelocity { 
-                                linvel: Vec3::ZERO.into(),//(-1.0 * voxel.position).into(), 
+                                linvel: Vec3::ZERO.into(),
                                 angvel: Vec3::ZERO.into()
                             },
-                            forces: bevy_rapier3d::prelude::RigidBodyForces { gravity_scale: 1.0, ..Default::default() },
-                            activation: bevy_rapier3d::prelude::RigidBodyActivation::cannot_sleep(),
+                            forces: bevy_rapier3d::prelude::RigidBodyForces { gravity_scale: 0.0, ..Default::default() },
+                            activation: bevy_rapier3d::prelude::RigidBodyActivation::active(),
                             ccd: bevy_rapier3d::prelude::RigidBodyCcd { ccd_enabled: true, ..Default::default() },
                             ..Default::default()
                         })
