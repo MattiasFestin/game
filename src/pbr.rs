@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 
 use bevy::prelude::*;
 use bevy::reflect::{TypeUuidDynamic, Uuid};
+use dashmap::DashMap;
 
 pub struct BoxMeshHandle(pub Handle<Mesh>);
 
@@ -104,16 +106,14 @@ impl PbrConfig {
     }
 }
 
-// static mut MATERIAL_MAPPINGS: Option<HashMap<u64, StandardMaterial>> = None;
-// static mut NUMBER_OF_MATERIALS: u64 = 0;
 pub struct MaterialsMapping {
-    pub map: HashMap<u64, StandardMaterial>
+    pub map: Arc<DashMap<u64, PbrConfig>>
 }
 
 impl Default for MaterialsMapping {
     fn default() -> Self {
         Self {
-            map: HashMap::new()
+            map: Arc::new(DashMap::new())
         }
     }
 }
@@ -121,7 +121,7 @@ impl Default for MaterialsMapping {
 pub fn load_materials(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    // mut materials_mappings: ResMut<MaterialsMapping>
+    mut materials_mappings: Local<MaterialsMapping>
 ) {
     let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 1.0 }));
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
@@ -132,7 +132,8 @@ pub fn load_materials(
         .expect("Something went wrong reading the file");
 
     let dict: HashMap<String, PbrConfig> = toml::from_str(&contents).unwrap();
+
     for (_k, v) in dict {
-        // materials_mappings.map.insert(v.id, v.pbr());
+        materials_mappings.map.insert(v.id, v);
     }
 }

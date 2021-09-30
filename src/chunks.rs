@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, pin::Pin, sync::{Arc, Mutex}};
 
 use crate::{constants::{CHUNKS_LOADED, CHUNK_SIZE}, noise, pbr::{BoxMeshHandle, MaterialsMapping}};
 use bevy::{prelude::*, tasks::{AsyncComputeTaskPool, Task}};
 use bevy_rng::Rng;
-use futures_lite::future;
+use futures_lite::future::{self, yield_now};
 use lru::LruCache;
 
 #[derive(Debug, PartialEq, Clone, Reflect)]
@@ -63,59 +63,84 @@ pub fn load_chunk(
 	camera_query: Query<&Transform, With<crate::camera::PlayerCamera>>,
 	thread_pool: Res<AsyncComputeTaskPool>,
 	state: Local<crate::state::GameState>,
-	loaded: Local<LoadedChunks>,
-	// materials_mappings: Local<MaterialsMapping>
+
+    chunkQuery: Query<&VoxelChunk, With<VoxelChunk>>
+	// mut loaded: ResMut<Option<LoadedChunks>>,
+	// materials_mappings: Res<Option<MaterialsMapping>>
 ) {
 	if let Ok(t) = camera_query.single() {
-		let x = t.translation.x.floor() as u64;
-		let y = t.translation.y.floor() as u64;
+        // if materials_mappings.is_some() {// && loaded.is_some() {
+            let x = t.translation.x.floor() as u64;
+            let y = t.translation.y.floor() as u64;
 
-		// let arc_materials_mappings = Arc::new(Mutex::new(materials_mappings));
-		let seed = state.seed;
-		if !loaded.is_loaded(x, y) {
-			println!("Not loaded ({0}, {1})", x, y);
-			let task = thread_pool.spawn(async move {
-				let mut chunk = VoxelChunk::default();
-				// if let Ok(mm_lock) = arc_materials_mappings.lock() {
-					// let mm = *mm_lock;
-					// while materials_mappings.keys().count() == 0 {
-					// 	println!("waiting...");
-					// 	future::yield_now().await;
-					// }
-			
-					let hightmap = simdnoise::NoiseBuilder::fbm_2d(crate::constants::CHUNK_SIZE, crate::constants::CHUNK_SIZE)
-						.with_seed(seed as i32)
-						.generate_scaled(0.0, 1.0 );
-			
-					let cs = crate::constants::CHUNK_SIZE as f32;
-			
-					
-					for x in 0..CHUNK_SIZE {
-						for z in 0..CHUNK_SIZE {
-							let y_index = x + z * CHUNK_SIZE;
-							let max_y = (hightmap[y_index] * cs).floor() as usize;
-			
-							for y in 0..max_y {
-								println!("Creating ({0}, {1}, {2})", x, y, z);
-								let index = (x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE) as u64;
-								chunk.voxels.push(Voxel {
-									id: noise::noise_1d(index, seed),
-									position: Vec3::new(x as f32, y as f32, z as f32),
-									pbr_id: 0, //unsafe { noise::noise_1d(index, seed) % NUMBER_OF_MATERIALS }
-								});
-							}
-						}
-					}
-				// }
+            let seed = state.seed;
+            
+            let len = 2u64;//materials_mappings.as_ref().unwrap().map.len() as u64;
+            let is_loaded = false;//loaded.as_ref().unwrap().is_loaded(x, y);
 
-				return chunk;
-			});
-		
-			commands.spawn().insert(task);
-		} else {
-			println!("Is loaded ({0}, {1})", x, y);
-		}
+            if !is_loaded {
+                println!("Not loaded ({0}, {1})", x, y);
+                
+            
+                commands.spawn().insert(spawn_task(seed, thread_pool, len));
+            } else {
+                println!("Is loaded ({0}, {1})", x, y);
+            }
+        // }
 	}
+}
+
+fn spawn_task(
+    seed: u64,
+    thread_pool: Res<AsyncComputeTaskPool>,
+    len: u64
+) -> Task<VoxelChunk> {
+    return thread_pool.spawn(async move {
+        // let materials_mappings = &mut *materials_mappings;
+        // let mut mm = *materials_mappings.lock().unwrap();
+        // let map = map_pin);
+
+        let mut chunk = VoxelChunk::default();
+        
+        let hightmap = simdnoise::NoiseBuilder::fbm_2d(crate::constants::CHUNK_SIZE, crate::constants::CHUNK_SIZE)
+            .with_seed(seed as i32)
+            .generate_scaled(0.0, 1.0 );
+
+        let cs = crate::constants::CHUNK_SIZE as f32;
+
+        
+        for x in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
+                let y_index = x + z * CHUNK_SIZE;
+                let max_y = (hightmap[y_index] * cs).floor() as usize;
+
+                for y in 0..max_y {
+                    let index = (x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE) as u64;
+                    let pbr_id = index % len;
+                    chunk.voxels.push(Voxel {
+                        id: noise::noise_1d(index, seed),
+                        position: Vec3::new(x as f32, y as f32, z as f32),
+                        pbr_id: pbr_id,
+                    });
+                }
+            }
+        }
+
+        // loaded.insert(x, y, chunk);
+
+        return chunk;
+    });
+}
+
+pub fn setup_material_mappings(
+    mut commands: Commands
+) {
+    println!("setup_material_mappings");
+    commands
+        .insert_resource(MaterialsMapping::default());
+    
+    commands
+        .insert_resource(LoadedChunks::default());
 }
 
 pub fn create_voxels<'a>(
@@ -124,34 +149,25 @@ pub fn create_voxels<'a>(
     mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     box_mesh_handle: Res<BoxMeshHandle>,
-    _rng: Local<Rng>,
-	materials_mappings: Local<HashMap<u64, StandardMaterial>>
+	materials_mappings: Res<MaterialsMapping>
 ) {
     for (entity, mut task) in voxel_chunk_tasks.iter_mut() {
         if let Some(voxel_chunk) = future::block_on(future::poll_once(&mut *task)) {
-
             for voxel in voxel_chunk.voxels {
-                println!("voxel");
-
-                if let Some(m) = materials_mappings.get(&voxel.pbr_id) {
+                println!("Voxel: {:?}", voxel.id);
+                if let Some(p) = materials_mappings.map.get(&voxel.pbr_id) {
                     commands
                         .spawn()
+
+                    //TODO: insert chunk as parent and voxels as childern...
+
                         .insert_bundle(PbrBundle {
                             visible: Visible {
                                 is_visible: true,
                                 is_transparent: false,
                             },
                             mesh: box_mesh_handle.0.clone(),
-                            material: materials.add(StandardMaterial {
-                                double_sided: m.double_sided,
-                                base_color: m.base_color,
-                                metallic: m.metallic,
-                                reflectance: m.reflectance,
-                                roughness: m.roughness,
-                                emissive: m.emissive,
-                                unlit: m.unlit,
-                                ..Default::default()
-                            }),
+                            material: materials.add(p.pbr()),
                             transform: Transform::from_translation(voxel.position),
                             ..Default::default()
                         })

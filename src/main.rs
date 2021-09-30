@@ -16,6 +16,7 @@ extern crate core_simd;
 extern crate simdnoise;
 extern crate rand;
 extern crate lru;
+extern crate dashmap;
 
 use crate::chunks::LoadedChunks;
 use crate::chunks::Voxel;
@@ -24,6 +25,8 @@ use crate::pbr::PbrConfig;
 use bevy_rng::Rng;
 use chunks::create_voxels;
 use chunks::load_chunk;
+use chunks::setup_material_mappings;
+use pbr::MaterialsMapping;
 use pbr::load_materials;
 
 use std::collections::HashMap;
@@ -72,6 +75,9 @@ fn main() {
         .add_system_to_stage(CoreStage::PreUpdate, input::connection_system.system())
         .add_system(input::gamepad_system.system().label("gamepad"))
 
+
+        .init_resource::<LoadedChunks>()
+        .init_resource::<MaterialsMapping>()
         .add_startup_system(setup_env.system())
         .add_startup_system(load_materials.system())
         
