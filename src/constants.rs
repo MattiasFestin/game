@@ -1,5 +1,7 @@
 pub const CHUNK_SIZE: usize = 10;
 pub const CHUNK_SIZE_CUBE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+pub const CHUNKS_LOADED: usize = 9;
+
 
 pub const MIN_FORCE: f32 = 0.01;
 pub const MIN_VELOCITY: f32 = 0.01;

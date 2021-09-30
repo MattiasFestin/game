@@ -15,8 +15,13 @@ extern crate bevy_rng;
 extern crate core_simd;
 extern crate simdnoise;
 extern crate rand;
+extern crate lru;
 
+use crate::chunks::LoadedChunks;
+use crate::chunks::Voxel;
+use crate::chunks::VoxelChunk;
 use bevy_rng::Rng;
+use chunks::load_chunk;
 
 use std::collections::HashMap;
 use std::fs;
@@ -40,6 +45,7 @@ mod input;
 mod physics;
 mod noise;
 mod state;
+mod chunks;
 
 fn main() {
     App::build()
@@ -64,83 +70,17 @@ fn main() {
 
         .add_startup_system(setup_env.system())
         .add_startup_system(add_assets.system())
-        .add_startup_system(spawn_tasks.system())
-
+        
+		.add_system(load_chunk.system())
+		
         // .add_system(rotation_system.system())
         .add_system(handle_tasks.system())
-
-        // .add_system(print_ball_altitude.system())
-
-        // .add_system(physics::position.system().label(physics::PhysicsSystem::Position).after(physics::PhysicsSystem::Velocity))
-        // .add_system_set(SystemSet::new()
-        //     .label(physics::Physics)
-        //     .with_run_criteria(FixedTimestep::step(constants::PHYSICS_TICKS))
-        //     .with_system(physics::velocity.system().label(physics::PhysicsSystem::Velocity).after(physics::PhysicsSystem::Force))
-        //     .with_system(physics::force.system().label(physics::PhysicsSystem::Force))
-        //     .with_system(physics::gravity.system().label(physics::PhysicsSystem::Gravity).before(physics::PhysicsSystem::Force))
-        //     .with_system(physics::collition.system().after(physics::PhysicsSystem::Position))
-        // )
 
         //Start game
         .run();
 }
 
-#[derive(Debug, PartialEq, Clone, Reflect)]
-#[reflect(Component, PartialEq)]
-struct Voxel {
-    pub position: Vec3,
-    pub id: u64,
-    pub pbr_id: u64
-}
-
-impl Default for Voxel {
-    fn default() -> Self {
-        Self { position: Vec3::ZERO , pbr_id: 0u64, id: 0u64 }
-    }
-}
-#[derive(Debug, PartialEq, Clone, Reflect)]
-#[reflect(Component, PartialEq)]
-struct VoxelChunk {
-    pub position: Vec3,
-    pub voxels: Vec<Voxel>
-    // pub bounding_box: 
-}
-
-impl Default for VoxelChunk {
-    fn default() -> Self {
-        Self { 
-            position: Vec3::ZERO,
-            voxels: Vec::new()
-            // (1..CHUNK_SIZE_CUBE).into_iter().map(|index| {
-            //     let rest = index;
-            //     let x = rest % CHUNK_SIZE;
-
-            //     let rest = (rest - x) / CHUNK_SIZE;
-            //     let y = rest % CHUNK_SIZE;
-
-            //     let rest = (rest - y) / CHUNK_SIZE;
-            //     let z = rest % CHUNK_SIZE;
-
-            //     println!("{:?},{:?},{:?}", x, y, z);
-            //     let position = Vec3::new(x as f32, y as f32, z as f32); //TODO: Chunk Offset
-            //     Voxel {
-            //         id: index as u64,
-            //         position,
-            //         ..Default::default()
-            //     }
-            // }).collect() 
-        }
-    }
-}
-
-
 struct BoxMeshHandle(Handle<Mesh>);
-
-// #[derive(Debug, TypeUuid)]
-// #[uuid = "f28c2ec3-0d0c-4ecd-8622-63e6d4262a60"]
-// struct MaterialMapping {
-//     map: HashMap<u64, PbrConfig>
-// }
 
 static mut MATERIAL_MAPPINGS: Option<HashMap<u64, StandardMaterial>> = None;
 static mut NUMBER_OF_MATERIALS: u64 = 0;
@@ -169,49 +109,6 @@ fn add_assets(
         MATERIAL_MAPPINGS = Some(map);
         NUMBER_OF_MATERIALS = count;
     }
-}
-
-fn spawn_tasks(
-        mut commands: Commands,
-        thread_pool: Res<AsyncComputeTaskPool>,
-        state: Local<crate::state::GameState>
-    ) {
-    let seed = state.seed;
-    let task = thread_pool.spawn(async move {
-        unsafe {
-            while NUMBER_OF_MATERIALS == 0 {
-                println!("waiting...");
-                future::yield_now().await;
-            }
-        }
-
-        let hightmap = simdnoise::NoiseBuilder::fbm_2d(crate::constants::CHUNK_SIZE, crate::constants::CHUNK_SIZE)
-            .with_seed(seed as i32)
-            .generate_scaled(0.0, unsafe {NUMBER_OF_MATERIALS as f32 });
-
-        let cs = crate::constants::CHUNK_SIZE as f32;
-
-        let mut chunk = VoxelChunk::default();
-        for x in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                let y_index = x + z * CHUNK_SIZE;
-                let max_y = (hightmap[y_index] * cs).floor() as usize;
-
-                for y in 0..max_y {
-                    let index = (x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE) as u64;
-                    chunk.voxels.push(Voxel {
-                        id: noise::noise_1d(index, seed),
-                        position: Vec3::new(x as f32, y as f32, z as f32),
-                        pbr_id: unsafe { noise::noise_1d(index, seed) % NUMBER_OF_MATERIALS },
-                    });
-                }
-            }
-        }
-
-        return chunk;
-    });
-
-    commands.spawn().insert(task);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -376,129 +273,9 @@ fn handle_tasks<'a>(
                         })
                         .insert(Transform::default())
                         .insert(bevy_rapier3d::physics::RigidBodyPositionSync::Discrete)
-                        // .insert(physics::Position {
-                        //     position: voxel.position.into()
-                        // })
-                        // .insert(physics::Velocity {
-                        //     velocity: Vec3A::ZERO,
-                        // })
-                        // .insert(physics::Force {
-                        //     force: Vec3A::new(rng.gen::<f32>()* - 0.5, rng.gen::<f32>() - 0.5, rng.gen::<f32>() - 0.5),
-                        //     is_dirty: true
-                        // })
-                        // .insert( physics::Mass {
-                        //     mass: 125000000000.0,//rng.gen::<f32>()*10.0,
-                        // })
-                        // .insert(physics::Identity {
-                        //     id: voxel.id
-                        // })
-                        // .insert(physics::InelasticCollision {
-                        //     cor: 0.75
-                        // })
-                        // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
-                        // .insert(bevy_frustum_culling::debug::DebugBounds)
                         ;
                 }
             }
-
-            // //Center heavy cube
-            // commands
-            //             .spawn()
-            //             .insert_bundle(PbrBundle {
-            //                 visible: Visible {
-            //                     is_visible: true,
-            //                     is_transparent: false,
-            //                 },
-            //                 mesh: box_mesh_handle.0.clone(),
-            //                 material: materials.add(StandardMaterial {
-            //                     double_sided: false,
-            //                     base_color: Color::ALICE_BLUE,
-            //                     ..Default::default()
-            //                 }),
-            //                 transform: Transform::from_translation(Vec3::ZERO),
-            //                 ..Default::default()
-            //             })
-            //             .insert(bevy_frustum_culling::aabb::Aabb::default())
-            //             .insert(physics::Position {
-            //                 position: Vec3::new(CHUNK_SIZE as f32 / 2.0, CHUNK_SIZE as f32 / 2.0, CHUNK_SIZE as f32 / 2.0)
-            //             })
-            //             .insert(physics::Velocity {
-            //                 velocity: Vec3::ZERO,
-            //             })
-            //             .insert(physics::Force {
-            //                 force: Vec3::ZERO,
-            //                 is_dirty: false
-            //             })
-            //             .insert( physics::Mass {
-            //                 mass: 1498284460.0,
-            //             })
-            //             .insert(physics::Identity {
-            //                 id: 99999999
-            //             })
-                        // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
-                        // .insert(bevy_frustum_culling::debug::DebugBounds)
-                        ;
-
-                // commands
-                //         .spawn()
-                //         .insert_bundle(PbrBundle {
-                //             visible: Visible {
-                //                 is_visible: true,
-                //                 is_transparent: false,
-                //             },
-                //             mesh: box_mesh_handle.0.clone(),
-                //             material: materials.add(StandardMaterial {
-                //                 double_sided: false,
-                //                 base_color: Color::ALICE_BLUE,
-                //                 ..Default::default()
-                //             }),
-                //             transform: Transform::from_translation(Vec3::ZERO),
-                //             ..Default::default()
-                //         })
-                //         .insert(bevy_frustum_culling::aabb::Aabb::default())
-                //         .insert(physics::Position {
-                //             position: Vec3::new(-10.0, -10.0, -10.0)
-                //         })
-                //         .insert(physics::Velocity {
-                //             velocity: Vec3::ZERO,
-                //         })
-                //         .insert(physics::Force {
-                //             force: Vec3::ZERO,
-                //             is_dirty: false
-                //         })
-                //         .insert( physics::Mass {
-                //             mass: 14982844643.0,
-                //         })
-                //         .insert(physics::Identity {
-                //             id: 99999999+1
-                //         })
-                //         // .insert(Bounded::<bevy_frustum_culling::aabb::Aabb>::default())
-                //         // .insert(bevy_frustum_culling::debug::DebugBounds)
-                //         ;
-
-                // let collider = bevy_rapier3d::physics::ColliderBundle {
-                //     shape: bevy_rapier3d::prelude::ColliderShape::cuboid(100.0, 0.1, 100.0),
-                //     ..Default::default()
-                // };
-                // commands.spawn_bundle(collider);
-            
-                // /* Create the bouncing ball. */
-                // let rigid_body = bevy_rapier3d::physics::RigidBodyBundle {
-                //     position: Vec3::new(0.0, 10.0, 0.0).into(),
-                //     ..Default::default()
-                // };
-                // let collider = bevy_rapier3d::physics::ColliderBundle {
-                //     shape: bevy_rapier3d::prelude::ColliderShape::ball(0.5),
-                //     material: bevy_rapier3d::prelude::ColliderMaterial {
-                //         restitution: 0.7,
-                //         ..Default::default()
-                //     },
-                //     ..Default::default()
-                // };
-                // commands.spawn_bundle(rigid_body)
-                //     .insert_bundle(collider)
-                //     .insert(bevy_rapier3d::physics::ColliderPositionSync::Discrete)
-                //     .insert(bevy_rapier3d::render::ColliderDebugRender::with_id(1));
 
             // Task is complete, so remove task component from entity
             commands.entity(entity).remove::<Task<VoxelChunk>>();
@@ -513,29 +290,3 @@ fn setup_env(mut commands: Commands) {
         ..Default::default()
     });
 }
-
-// struct Rotator;
-// /// Rotate the meshes to demonstrate how the bounding volumes update
-// fn rotation_system(
-//         time: Res<Time>,
-//         thread_pool: Res<ComputeTaskPool>,
-//         mut query: Query<(&mut Transform, Option<&Visible>), With<Rotator>>
-//     ) {
-//     // let tp = TaskPool::new();
-//     query.par_for_each_mut(&thread_pool, num_cpus::get(), |(mut transform, visible)| {
-//         if visible.is_some() && visible.unwrap().is_visible {
-//             // let scale = ::ONE * ((time.seconds_since_startup() as f32).sin() * 0.3 + 1.0) * 0.3;
-//             let rot_x = Quat::from_rotation_x(time.delta_seconds() as f32 * 5.0);
-//             let rot_y = Quat::from_rotation_y(time.delta_seconds() as f32 * 3.0);
-//             let rot_z = Quat::from_rotation_z(time.delta_seconds() as f32 * 2.0);
-//             // transform.scale = scale;
-//             transform.rotate(rot_x * rot_y * rot_z);
-//         }
-//     });
-// }
-
-// fn print_ball_altitude(positions: Query<&bevy_rapier3d::prelude::RigidBodyPosition>) {
-//     for rb_pos in positions.iter() {
-//         println!("Ball altitude: {}", rb_pos.position.translation.vector.y);
-//     }
-// }
