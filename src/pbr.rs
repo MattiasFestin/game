@@ -130,8 +130,8 @@ pub fn load_materials(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 1.0 }));
-    commands.insert_resource(BoxMeshHandle(box_mesh_handle));
 
+    commands.insert_resource(BoxMeshHandle(box_mesh_handle));1
 
     let cwd = std::env::current_dir().unwrap().display().to_string();
     let contents = fs::read_to_string(format!("{0}/assets/materials/base.toml", cwd))
