@@ -21,9 +21,9 @@
 //     Gravity,
 // }
 
-pub struct Identity {
-    pub id: u64
-}
+// pub struct Identity {
+//     pub id: u64
+// }
 
 // pub struct Position {
 //     pub position: Vec3A,

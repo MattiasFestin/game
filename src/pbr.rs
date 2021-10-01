@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::fs;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use bevy::prelude::*;
-use bevy::reflect::{TypeUuidDynamic, Uuid};
+use bevy::reflect::{TypeUuid, TypeUuidDynamic, Uuid};
 use dashmap::DashMap;
 
 pub struct BoxMeshHandle(pub Handle<Mesh>);
@@ -26,15 +27,6 @@ pub struct PbrConfig {
     // pub ansiotropy: u8,
 }
 
-impl TypeUuidDynamic for PbrConfig {
-    fn type_uuid(&self) -> Uuid {
-        self.uuid
-    }
-
-    fn type_name(&self) -> &'static str {
-        "PbrConfig"
-    }
-}
 
 impl Default for PbrConfig {
     fn default() -> Self {
@@ -106,8 +98,22 @@ impl PbrConfig {
     }
 }
 
+impl TypeUuidDynamic for PbrConfig {
+    fn type_uuid(&self) -> Uuid {
+        Uuid::from_str("17bd4300-be62-4fbe-b32f-40e1a0294421").unwrap()
+    }
+
+    fn type_name(&self) -> &'static str {
+        "PbrConfig"
+    }
+}
+
+// impl TypeUuid for PbrConfig {
+//     const TYPE_UUID: Uuid = Uuid::from_str("17bd4300-be62-4fbe-b32f-40e1a0294421").unwrap();
+// }
+
 pub struct MaterialsMapping {
-    pub map: Arc<DashMap<u64, PbrConfig>>
+    pub map: Arc<DashMap<u64, Handle<StandardMaterial>>>
 }
 
 impl Default for MaterialsMapping {
@@ -121,7 +127,7 @@ impl Default for MaterialsMapping {
 pub fn load_materials(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials_mappings: Local<MaterialsMapping>
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 1.0 }));
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
@@ -133,7 +139,13 @@ pub fn load_materials(
 
     let dict: HashMap<String, PbrConfig> = toml::from_str(&contents).unwrap();
 
+    let map = DashMap::new();
+
     for (_k, v) in dict {
-        materials_mappings.map.insert(v.id, v);
+        map.insert(v.id, materials.add(v.pbr()));
     }
+
+    commands.insert_resource(MaterialsMapping {
+        map: Arc::new(map)
+    });
 }

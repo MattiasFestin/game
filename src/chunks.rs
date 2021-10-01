@@ -82,7 +82,9 @@ pub fn load_chunk(
                 println!("Not loaded ({0}, {1})", x, y);
                 
             
-                commands.spawn().insert(spawn_task(seed, thread_pool, len));
+                commands.spawn().insert(thread_pool.spawn(async move {
+                    return generate_chunk(seed, x, y, CHUNK_SIZE as u64, len);
+                }));
             } else {
                 println!("Is loaded ({0}, {1})", x, y);
             }
@@ -90,46 +92,34 @@ pub fn load_chunk(
 	}
 }
 
-fn spawn_task(
-    seed: u64,
-    thread_pool: Res<AsyncComputeTaskPool>,
-    len: u64
-) -> Task<VoxelChunk> {
-    return thread_pool.spawn(async move {
-        // let materials_mappings = &mut *materials_mappings;
-        // let mut mm = *materials_mappings.lock().unwrap();
-        // let map = map_pin);
+fn generate_chunk(seed: u64, x: u64, y: u64, size: u64, number_of_materials: u64) -> VoxelChunk {
+    let mut chunk = VoxelChunk::default();
+    
+    let hightmap = simdnoise::NoiseBuilder::fbm_2d(crate::constants::CHUNK_SIZE, crate::constants::CHUNK_SIZE)
+        .with_seed(noise::noise_2d(x, y, seed) as i32)
+        .generate_scaled(0.0, 1.0 );
 
-        let mut chunk = VoxelChunk::default();
-        
-        let hightmap = simdnoise::NoiseBuilder::fbm_2d(crate::constants::CHUNK_SIZE, crate::constants::CHUNK_SIZE)
-            .with_seed(seed as i32)
-            .generate_scaled(0.0, 1.0 );
+    let cs = crate::constants::CHUNK_SIZE as f32;
 
-        let cs = crate::constants::CHUNK_SIZE as f32;
+    
+    for x in 0..size {
+        for z in 0..size {
+            let y_index = (x + z * size) as usize;
+            let max_y = (hightmap[y_index] * cs).floor() as u64;
 
-        
-        for x in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                let y_index = x + z * CHUNK_SIZE;
-                let max_y = (hightmap[y_index] * cs).floor() as usize;
-
-                for y in 0..max_y {
-                    let index = (x + y * CHUNK_SIZE + z * CHUNK_SIZE * CHUNK_SIZE) as u64;
-                    let pbr_id = index % len;
-                    chunk.voxels.push(Voxel {
-                        id: noise::noise_1d(index, seed),
-                        position: Vec3::new(x as f32, y as f32, z as f32),
-                        pbr_id: pbr_id,
-                    });
-                }
+            for y in 0..max_y {
+                let index = (x + y * size + z * size * size) as u64;
+                let pbr_id = index % number_of_materials;
+                chunk.voxels.push(Voxel {
+                    id: noise::noise_1d(index, seed),
+                    position: Vec3::new(x as f32, y as f32, z as f32),
+                    pbr_id: pbr_id,
+                });
             }
         }
+    }
 
-        // loaded.insert(x, y, chunk);
-
-        return chunk;
-    });
+    return chunk;
 }
 
 pub fn setup_material_mappings(
@@ -147,19 +137,19 @@ pub fn create_voxels<'a>(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
     mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     box_mesh_handle: Res<BoxMeshHandle>,
-	materials_mappings: Res<MaterialsMapping>
+	material_mapping: Res<MaterialsMapping>
 ) {
     for (entity, mut task) in voxel_chunk_tasks.iter_mut() {
+        println!("create_voxels");
         if let Some(voxel_chunk) = future::block_on(future::poll_once(&mut *task)) {
             for voxel in voxel_chunk.voxels {
                 println!("Voxel: {:?}", voxel.id);
-                if let Some(p) = materials_mappings.map.get(&voxel.pbr_id) {
+                if let Some(m) = material_mapping.map.get(&voxel.pbr_id) {
                     commands
                         .spawn()
 
-                    //TODO: insert chunk as parent and voxels as childern...
+                        //TODO: insert chunk as parent and voxels as childern...
 
                         .insert_bundle(PbrBundle {
                             visible: Visible {
@@ -167,7 +157,7 @@ pub fn create_voxels<'a>(
                                 is_transparent: false,
                             },
                             mesh: box_mesh_handle.0.clone(),
-                            material: materials.add(p.pbr()),
+                            material: m.value().clone(),
                             transform: Transform::from_translation(voxel.position),
                             ..Default::default()
                         })
@@ -200,5 +190,27 @@ pub fn create_voxels<'a>(
             // Task is complete, so remove task component from entity
             commands.entity(entity).remove::<Task<VoxelChunk>>();
         }
+    }
+}
+
+mod tests {
+    extern crate test;
+    use test::Bencher;
+
+
+    #[test]
+    fn squirrel3_tests() {
+        let chunk = super::generate_chunk(55, 0, 0, 10, 42);
+        assert_eq!(387, chunk.voxels.len());
+        assert_eq!(bevy::math::Vec3::new(0.0, 0.0, 0.0), chunk.voxels[0].position);
+        assert_eq!(bevy::math::Vec3::new(0.0, 1.0, 0.0), chunk.voxels[1].position);
+        // let seed = 55u64;
+        // assert_eq!(12687927802791220436, crate::noise::squirrel3(1, seed));
+
+        // let seed = 56u64;
+        // assert_eq!(12687927848928216793, crate::noise::squirrel3(1, seed));
+
+        // let seed = 0u64;
+        // assert_eq!(3033592379929695938, crate::noise::squirrel3(0, seed));
     }
 }

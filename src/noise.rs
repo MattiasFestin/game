@@ -68,9 +68,9 @@ mod tests {
 
     #[bench]
     fn perlin_2d(b: &mut Bencher) {
+        let seed = test::black_box(1000);
         b.iter(|| {
-            let seed = test::black_box(1000);
-            simdnoise::NoiseBuilder::fbm_2d(128, 128).with_seed(seed).generate_scaled(0.0, 1.0);
+            simdnoise::NoiseBuilder::fbm_2d(1024, 1024).with_seed(seed).generate_scaled(0.0, 1.0);
         });
     }
 }
