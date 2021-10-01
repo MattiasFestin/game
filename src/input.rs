@@ -106,7 +106,7 @@ pub fn gamepad_system(
     }
 }
 
-fn mouse_keyboard_system(
+pub fn mouse_keyboard_system(
     mut windows: ResMut<Windows>,
     btn: Res<Input<MouseButton>>,
     key: Res<Input<KeyCode>>,

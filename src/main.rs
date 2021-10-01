@@ -70,20 +70,17 @@ fn main() {
         //Camera
         .add_startup_system(camera::setup_camera.system())
 
+        .add_startup_system(load_materials.system())
+        .add_startup_system(setup_env.system())
+
         //Input register
         .init_resource::<input::GamepadLobby>()
         .add_system_to_stage(CoreStage::PreUpdate, input::connection_system.system())
         .add_system(input::gamepad_system.system().label("gamepad"))
+        .add_system(input::mouse_keyboard_system.system())
 
-
-        .init_resource::<LoadedChunks>()
-        .init_resource::<MaterialsMapping>()
-        .add_startup_system(setup_env.system())
-        .add_startup_system(load_materials.system())
         
 		.add_system(load_chunk.system())
-		
-        // .add_system(rotation_system.system())
         .add_system(create_voxels.system())
 
         //Start game
@@ -91,7 +88,9 @@ fn main() {
 }
 
 
-fn setup_env(mut commands: Commands) {
+fn setup_env(
+    mut commands: Commands,
+) {
     // lights
     commands.spawn_bundle(LightBundle {
         transform: Transform::from_translation(Vec3::new(0.8, 0.8, 0.8)),
