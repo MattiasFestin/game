@@ -40,58 +40,49 @@ pub fn gamepad_system(
         let mut xr = Quat::IDENTITY;
         let mut yr = Quat::IDENTITY;
 
-        let right_stick_x = axes
-            .get(GamepadAxis(gamepad, GamepadAxisType::RightStickX))
-            .unwrap();
-        if right_stick_x.abs() > 0.1 {
-            xr = Quat::from_rotation_y( - right_stick_x * (time.delta_seconds() as f32));
-            info!("{:?} RightStickX value is {}", gamepad, right_stick_x);
+        if let Some(right_stick_x) = axes.get(GamepadAxis(gamepad, GamepadAxisType::RightStickX)) {
+            if right_stick_x.abs() > 0.1 {
+                xr = Quat::from_rotation_y( - right_stick_x * (time.delta_seconds() as f32));
+            }
         }
 
-        let right_stick_y = axes
-            .get(GamepadAxis(gamepad, GamepadAxisType::RightStickY))
-            .unwrap();
-        if right_stick_y.abs() > 0.1 {
-            yr = Quat::from_rotation_x(right_stick_y * (time.delta_seconds() as f32));
-            info!("{:?} RightStickY value is {}", gamepad, right_stick_y);
+        if let Some(right_stick_y) = axes.get(GamepadAxis(gamepad, GamepadAxisType::RightStickY)) {
+            if right_stick_y.abs() > 0.1 {
+                yr = Quat::from_rotation_x(right_stick_y * (time.delta_seconds() as f32));
+            }
         }
 
         let mut xp = 0f32;
-        let left_stick_x = axes
-            .get(GamepadAxis(gamepad, GamepadAxisType::LeftStickX))
-            .unwrap();
-        if left_stick_x.abs() > 0.1 {
-            xp = left_stick_x;
-            info!("{:?} LeftStickX value is {}", gamepad, left_stick_x);
+        if let Some(left_stick_x) = axes.get(GamepadAxis(gamepad, GamepadAxisType::LeftStickX)) {
+            if left_stick_x.abs() > 0.1 {
+                xp = left_stick_x;
+            }
         }
 
         let mut yp = 0f32;
-        let left_stick_y = axes
-            .get(GamepadAxis(gamepad, GamepadAxisType::LeftStickY))
-            .unwrap();
-        if left_stick_y.abs() > 0.1 {
-            yp = left_stick_y;
-            info!("{:?} LeftStickX value is {}", gamepad, left_stick_y);
+        if let Some(left_stick_y) = axes.get(GamepadAxis(gamepad, GamepadAxisType::LeftStickY)) {
+            if left_stick_y.abs() > 0.1 {
+                yp = left_stick_y;
+            }
         }
 
-        let mut right_trigger = button_axes
-            .get(GamepadButton(gamepad, GamepadButtonType::RightTrigger2))
-            .unwrap();
-        if right_trigger.abs() < 0.1 {
-            right_trigger = 0.0f32;
-        } else {
-            info!("{:?} RightTrigger2 value is {}", gamepad, right_trigger);
-        }
-        let mut left_trigger = button_axes
-            .get(GamepadButton(gamepad, GamepadButtonType::LeftTrigger2))
-            .unwrap();
-        if left_trigger.abs() < 0.1 {
-            left_trigger = 0.0f32;
-        } else {
-            info!("{:?} LeftTrigger2 value is {}", gamepad, left_trigger);
+        let mut zp = 0.0f32;
+        if let Some(mut right_trigger) = button_axes.get(GamepadButton(gamepad, GamepadButtonType::RightTrigger2)) {
+            if right_trigger.abs() < 0.1 {
+                right_trigger = 0.0f32;
+            }
+            
+
+            if let Some(mut left_trigger) = button_axes.get(GamepadButton(gamepad, GamepadButtonType::LeftTrigger2)) {
+                if left_trigger.abs() < 0.1 {
+                    left_trigger = 0.0f32;
+                }
+
+                zp = right_trigger - left_trigger
+            }
         }
 
-        let zp = right_trigger - left_trigger;
+        
 
         match camera_query.single_mut() {
             Ok(mut transform) => {

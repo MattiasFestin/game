@@ -69,15 +69,15 @@ pub fn load_chunk(
 	// materials_mappings: Res<Option<MaterialsMapping>>
 ) {
 	if let Ok(t) = camera_query.single() {
-        let floot_t = (t.translation / (CHUNK_SIZE as f32)).floor();
-        if !chunk_query.iter().any(|x| x.position.abs_diff_eq(floot_t, CHUNK_SIZE as f32)) {
-            println!("Generating chunk {:?}", t.translation);
+        let ft = (CHUNK_SIZE as f32) * (t.translation / (CHUNK_SIZE as f32)).floor();
+        if !chunk_query.iter().any(|x| (ft.x - x.position.x).abs() < 1.0 || (ft.y - x.position.y).abs() < 1.0) {
+            println!("Generating chunk {:?}, {:?}", ft, t.translation);
             let seed = state.seed;
             
             let len = 2u64;//materials_mappings.as_ref().unwrap().map.len() as u64;
 
             commands.spawn().insert(thread_pool.spawn(async move {
-                return generate_chunk(seed, floot_t, CHUNK_SIZE as u64, len);
+                return generate_chunk(seed, ft, CHUNK_SIZE as u64, len);
             }));
         }
 	}
@@ -92,9 +92,9 @@ fn generate_chunk(seed: u64, pos: Vec3, size: u64, number_of_materials: u64) -> 
     
     let hightmap = simdnoise::NoiseBuilder::fbm_2d(size as usize, size as usize)
         .with_seed(noise::noise_2d(x, y, seed) as i32)
-        .generate_scaled(0.0, 1.0 );
+        .generate_scaled(0.0, 1.0);
 
-    let cs = CHUNK_SIZE as f32;
+    let cs = size as f32;
 
     
     for x in 0..size {
@@ -141,116 +141,77 @@ pub fn create_voxels<'a>(
         if let Some(voxel_chunk) = future::block_on(future::poll_once(&mut *task)) {
             if !existing_voxel_chunks.iter().any(|x| x.position.abs_diff_eq(voxel_chunk.position, 0.9)) {
                 let voxels = voxel_chunk.voxels.clone();
-                let pos = voxel_chunk.position.clone();
-                commands
-                    .spawn()
-                    .insert(voxel_chunk)
-                    .insert(Transform::from_translation(pos))
-                    .with_children(|parent| {
-                        for voxel in voxels {
-                            if let Some(m) = material_mapping.map.get(&voxel.pbr_id) {
-                                println!("{:?}", voxel.position);
-                                parent
-                                    .spawn()
-                                    .insert_bundle(PbrBundle {
-                                        visible: Visible {
-                                            is_visible: true,
-                                            is_transparent: false,
-                                        },
-                                        mesh: box_mesh_handle.0.clone(),
-                                        material:  materials.add(StandardMaterial {
-                                            base_color: Color::BLUE,
-                                            ..Default::default()
-                                        }),
-                                        transform: Transform::from_translation(voxel.position),
-                                        ..Default::default()
-                                    })
-                                    .insert(bevy_frustum_culling::aabb::Aabb::default())
-                                    .insert_bundle(bevy_rapier3d::physics::RigidBodyBundle {
-                                        position: voxel.position.into(),
-                                        velocity: bevy_rapier3d::prelude::RigidBodyVelocity { 
-                                            linvel: Vec3::ZERO.into(),
-                                            angvel: Vec3::ZERO.into()
-                                        },
-                                        forces: bevy_rapier3d::prelude::RigidBodyForces { gravity_scale: 1.0, ..Default::default() },
-                                        activation: bevy_rapier3d::prelude::RigidBodyActivation::cannot_sleep(),
-                                        ccd: bevy_rapier3d::prelude::RigidBodyCcd { ccd_enabled: true, ..Default::default() },
-                                        ..Default::default()
-                                    })
-                                    .insert_bundle(bevy_rapier3d::physics::ColliderBundle {
-                                        shape: bevy_rapier3d::prelude::ColliderShape::cuboid(1.0, 1.0, 1.0),
-                                        collider_type: bevy_rapier3d::prelude::ColliderType::Sensor,
-                                        position: (voxel.position.into(), Quat::from_rotation_x(0.0)).into(),
-                                        material: bevy_rapier3d::prelude::ColliderMaterial { friction: 0.7, restitution: 0.3, ..Default::default() },
-                                        mass_properties: bevy_rapier3d::prelude::ColliderMassProps::Density(2.0),
-                                        ..Default::default()
-                                    })
-                                    .insert(Transform {
-                                        rotation: Quat::default(),
-                                        scale: Vec3::new(1.0,1.0,1.0),
-                                        translation: voxel.position.into()
-                                    })
-                                    .insert(bevy_rapier3d::physics::RigidBodyPositionSync::Discrete)
-                                    ;
-                            }
+                // let pos = voxel_chunk.position.clone();
+                for voxel in voxels {
+                    if let Some(m) = material_mapping.map.get(&voxel.pbr_id) {
+                        commands
+                            .spawn()
+                            .insert_bundle(PbrBundle {
+                                visible: Visible {
+                                    is_visible: true,
+                                    is_transparent: false,
+                                },
+                                mesh: box_mesh_handle.0.clone(),
+                                material: m.value().clone(),
+                                // materials.add(StandardMaterial {
+                                //     base_color: ,
+                                //     ..Default::default()
+                                // }),
+                                transform: Transform::from_translation(voxel.position),
+                                ..Default::default()
+                            })
+                            // .spawn()
+                            // .insert(voxel_chunk)
+                            // .with_children(|parent| {
+                            //     for voxel in voxels {
+                            //         if let Some(m) = material_mapping.map.get(&voxel.pbr_id) {
+                            //             parent
+                            //                 .spawn()
+                            //                 .insert_bundle(PbrBundle {
+                            //                     visible: Visible {
+                            //                         is_visible: true,
+                            //                         is_transparent: false,
+                            //                     },
+                            //                     mesh: box_mesh_handle.0.clone(),
+                            //                     material:  materials.add(StandardMaterial {
+                            //                         base_color: Color::BLUE,
+                            //                         ..Default::default()
+                            //                     }),
+                            //                     transform: Transform::from_translation(voxel.position),
+                            //                     ..Default::default()
+                            //                 }); 
+                            //         }
+                            //     }
+                            
+                            // })
+                            .insert(bevy_frustum_culling::aabb::Aabb::default())
+                            // .insert_bundle(bevy_rapier3d::physics::RigidBodyBundle {
+                            //     position: pos.into(),
+                            //     velocity: bevy_rapier3d::prelude::RigidBodyVelocity { 
+                            //         linvel: Vec3::ZERO.into(),
+                            //         angvel: Vec3::ZERO.into()
+                            //     },
+                            //     forces: bevy_rapier3d::prelude::RigidBodyForces { gravity_scale: 1.0, ..Default::default() },
+                            //     activation: bevy_rapier3d::prelude::RigidBodyActivation::cannot_sleep(),
+                            //     ccd: bevy_rapier3d::prelude::RigidBodyCcd { ccd_enabled: true, ..Default::default() },
+                            //     ..Default::default()
+                            // })
+                            // .insert_bundle(bevy_rapier3d::physics::ColliderBundle {
+                            //     shape: bevy_rapier3d::prelude::ColliderShape::cuboid(1.0, 1.0, 1.0),
+                            //     collider_type: bevy_rapier3d::prelude::ColliderType::Sensor,
+                            //     position: (pos, Quat::from_rotation_x(0.0)).into(),
+                            //     material: bevy_rapier3d::prelude::ColliderMaterial { friction: 0.7, restitution: 0.3, ..Default::default() },
+                            //     mass_properties: bevy_rapier3d::prelude::ColliderMassProps::Density(2.0),
+                            //     ..Default::default()
+                            // })
+                            // .insert(bevy_rapier3d::physics::RigidBodyPositionSync::Discrete)
+                            ;
                         }
-                    });
+                    }
                 }
             }
 
             commands.entity(entity).remove::<Task<VoxelChunk>>();
-// =======
-//             commands
-//                 .spawn()
-//                 .insert(voxel_chunk)
-//                 .with_children(|parent| {
-//                     for voxel in voxel_chunk.voxels {
-//                         println!("Voxel: {:?}", voxel.id);
-//                         if let Some(p) = materials_mappings.map.get(&voxel.pbr_id) {
-//                             parent
-//                                 .spawn()
-        
-//                             //TODO: insert chunk as parent and voxels as childern...
-        
-//                                 .insert_bundle(PbrBundle {
-//                                     visible: Visible {
-//                                         is_visible: true,
-//                                         is_transparent: false,
-//                                     },
-//                                     mesh: box_mesh_handle.0.clone(),
-//                                     material: materials.add(p.pbr()),
-//                                     transform: Transform::from_translation(voxel.position),
-//                                     ..Default::default()
-//                                 })
-//                                 .insert(bevy_frustum_culling::aabb::Aabb::default())
-//                                 .insert_bundle(bevy_rapier3d::physics::RigidBodyBundle {
-//                                     position: voxel.position.into(),
-//                                     velocity: bevy_rapier3d::prelude::RigidBodyVelocity { 
-//                                         linvel: Vec3::ZERO.into(),
-//                                         angvel: Vec3::ZERO.into()
-//                                     },
-//                                     forces: bevy_rapier3d::prelude::RigidBodyForces { gravity_scale: 0.0, ..Default::default() },
-//                                     activation: bevy_rapier3d::prelude::RigidBodyActivation::active(),
-//                                     ccd: bevy_rapier3d::prelude::RigidBodyCcd { ccd_enabled: true, ..Default::default() },
-//                                     ..Default::default()
-//                                 })
-//                                 .insert_bundle(bevy_rapier3d::physics::ColliderBundle {
-//                                     shape: bevy_rapier3d::prelude::ColliderShape::ball(1.0),
-//                                     collider_type: bevy_rapier3d::prelude::ColliderType::Sensor,
-//                                     position: (Vec3::new(2.0, 0.0, 3.0), Quat::from_rotation_x(0.4)).into(),
-//                                     material: bevy_rapier3d::prelude::ColliderMaterial { friction: 0.7, restitution: 0.3, ..Default::default() },
-//                                     mass_properties: bevy_rapier3d::prelude::ColliderMassProps::Density(2.0),
-//                                     ..Default::default()
-//                                 })
-//                                 .insert(Transform::default())
-//                                 .insert(bevy_rapier3d::physics::RigidBodyPositionSync::Discrete);
-//                         }
-//                     }
-//                 });
-// >>>>>>> Stashed changes
-
-            // Task is complete, so remove task component from entity
-        // }
     }
 }
 
