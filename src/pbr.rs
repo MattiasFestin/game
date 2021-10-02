@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use bevy::prelude::*;
-use bevy::reflect::{TypeUuid, TypeUuidDynamic, Uuid};
+use bevy::reflect::{TypeUuidDynamic, Uuid};
 use dashmap::DashMap;
 
 pub struct BoxMeshHandle(pub Handle<Mesh>);
@@ -46,17 +46,11 @@ impl Default for PbrConfig {
 
 impl PbrConfig {
     pub fn color(&self) -> Color {
-        let h = (self.color[0] & 31) as f32;
-        let s = (self.color[1] & 31) as f32;
-        let l = (self.color[2] & 31) as f32;
-        return Color::hsl(h, s, l);
+        return Color::rgb_u8(self.color[0], self.color[1], self.color[2]);
     }
 
     pub fn emissive(&self) -> Color {
-        let h = (self.emissive[0] & 31) as f32;
-        let s = (self.emissive[1] & 31) as f32;
-        let l = (self.emissive[2] & 31) as f32;
-        return Color::hsl(h, s, l);
+        return Color::rgb_u8(self.emissive[0], self.emissive[1], self.emissive[2]);
     }
 
     pub fn metalic(&self) -> f32 {

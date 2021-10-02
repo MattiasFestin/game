@@ -18,30 +18,13 @@ extern crate rand;
 extern crate lru;
 extern crate dashmap;
 
-use crate::chunks::LoadedChunks;
-use crate::chunks::Voxel;
-use crate::chunks::VoxelChunk;
-use crate::pbr::PbrConfig;
-use bevy_rng::Rng;
 use chunks::create_voxels;
 use chunks::load_chunk;
-use chunks::setup_material_mappings;
-use pbr::MaterialsMapping;
 use pbr::load_materials;
-
-use std::collections::HashMap;
-use std::fs;
-
 
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
-use bevy::reflect::{TypeUuidDynamic, Uuid};
 
-use bevy::tasks::{AsyncComputeTaskPool, Task};
-
-
-use constants::{CHUNK_SIZE, CHUNK_SIZE_CUBE};
-use futures_lite::future;
 
 use bevy_rng::*;
 
@@ -59,8 +42,8 @@ fn main() {
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
 
-        // .add_plugin(LogDiagnosticsPlugin::default())
-        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(LogDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(RngPlugin::from(42)) //TODO: Seed
         .add_plugin(bevy_rapier3d::render::RapierRenderPlugin)
 
@@ -82,6 +65,8 @@ fn main() {
         
 		.add_system(load_chunk.system())
         .add_system(create_voxels.system())
+
+        .add_system(chunks::voxel_debug.system())
 
         //Start game
         .run();
