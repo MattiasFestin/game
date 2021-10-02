@@ -31,7 +31,7 @@ impl Default for PlayerCamera {
             rotation: Default::default(),
             
             rotation_easing: 10.0,
-            position_easing: 20.0,
+            position_easing: 5.0,
             
             rotation_speed: 4.0,
             position_speed: 400.0
@@ -44,7 +44,15 @@ pub fn update_camera(
     time: Res<Time>,
 ) {
     for (mut t, pc) in query.iter_mut() {
-        t.rotation = crate::easing::asymptotic_averaging_rot(t.rotation, pc.rotation, pc.rotation_easing * (time.delta_seconds() as f32));
-        t.translation = crate::easing::asymptotic_averaging_3d(t.translation, pc.position, pc.position_easing * (time.delta_seconds() as f32));
+        t.rotation = crate::easing::asymptotic_averaging_rot(
+            t.rotation,
+            pc.rotation,
+            pc.rotation_easing * (time.delta_seconds() as f32)
+        );
+        t.translation = crate::easing::asymptotic_averaging_3d(
+            t.translation, 
+            pc.position, 
+            pc.position_easing * (time.delta_seconds() as f32)
+        );
     }
 }

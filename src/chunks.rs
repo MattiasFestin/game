@@ -174,9 +174,9 @@ pub fn create_voxels<'a>(
                                         global_transform: GlobalTransform::from_translation(vc_pos + pos),
                                         ..Default::default()
                                     })
-                                    .insert(crate::physics::Heat {  
-                                        temperature: 6200.0 * tmp
-                                    })
+                                    // .insert(crate::physics::Heat {  
+                                    //     temperature: 6200.0 * tmp
+                                    // })
                                     .insert(bevy_frustum_culling::aabb::Aabb::default());
                             }
                         }

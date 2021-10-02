@@ -17,6 +17,7 @@ extern crate simdnoise;
 extern crate rand;
 extern crate lru;
 extern crate dashmap;
+extern crate bvh;
 
 use chunks::create_voxels;
 use chunks::load_chunk;
@@ -38,6 +39,7 @@ mod chunks;
 mod pbr;
 mod easing;
 mod projections;
+mod bsp;
 
 fn main() {
     App::build()

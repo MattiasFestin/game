@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use bevy::reflect::{TypeUuidDynamic, Uuid};
+use bevy::render::texture::{Extent3d, ImageType};
 use dashmap::DashMap;
 
 pub struct BoxMeshHandle(pub Handle<Mesh>);
@@ -77,7 +78,7 @@ impl PbrConfig {
     //     return (self.ansiotropy & 31) as f32 / 32.0f32;
     // }
 
-    pub fn pbr(&self) -> StandardMaterial {
+    pub fn pbr(&self, normal: Option<Handle<Texture>>) -> StandardMaterial {
         StandardMaterial {
             base_color: self.color(),
             emissive: self.emissive(),
@@ -86,6 +87,8 @@ impl PbrConfig {
             reflectance: self.reflectance(),
             roughness: self.roughness(),
             unlit: self.unlit,
+
+            normal_map: normal,
 
             ..Default::default()
         }
@@ -120,6 +123,7 @@ impl Default for MaterialsMapping {
 
 pub fn load_materials(
     mut commands: Commands,
+    mut textures: ResMut<Assets<Texture>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -128,15 +132,27 @@ pub fn load_materials(
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
 
     let cwd = std::env::current_dir().unwrap().display().to_string();
-    let contents = fs::read_to_string(format!("{0}/assets/materials/base.toml", cwd))
+    let path = format!("{0}/assets/materials/base.toml", cwd);
+
+    let contents = fs::read_to_string(path)
         .expect("Something went wrong reading the file");
 
     let dict: HashMap<String, PbrConfig> = toml::from_str(&contents).unwrap();
 
     let map = DashMap::new();
 
+    // let mut pixel: Vec<u8> = Vec::new();
+    // for x in 0..32 {
+    //     for y in 0..32 {
+    //         pixel.push(crate::noise::noise_2d(x as u64, y as u64, 54u64) as u8);
+    //     }
+    // }
+
+    // let texture = Texture::new_fill(Extent3d::new(32, 32, 1), bevy::render::texture::TextureDimension::D2, &pixel, bevy::render::texture::TextureFormat::R8Uint);
+    // let texture_handle = Some(textures.add(texture));
+    
     for (_k, v) in dict {
-        map.insert(v.id, materials.add(v.pbr()));
+        map.insert(v.id, materials.add(v.pbr(None)));
     }
 
     commands.insert_resource(MaterialsMapping {
