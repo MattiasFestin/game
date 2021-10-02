@@ -34,7 +34,7 @@ pub fn gamepad_system(
     button_axes: Res<Axis<GamepadButton>>,
     axes: Res<Axis<GamepadAxis>>,
     time: Res<Time>,
-    mut camera_query: Query<&mut Transform, With<crate::camera::PlayerCamera>>
+    mut camera_query: Query<&mut crate::camera::PlayerCamera, With<crate::camera::PlayerCamera>>
 ) {
     for gamepad in lobby.gamepads.iter().cloned() {
         let mut xr = Quat::IDENTITY;
@@ -85,10 +85,11 @@ pub fn gamepad_system(
         
 
         match camera_query.single_mut() {
-            Ok(mut transform) => {
-                transform.rotate(xr * yr);
-                let translation = transform.rotation * Vec3::new(xp, zp, -yp) * 0.3;
-                transform.translation += translation;
+            Ok(mut pc) => {
+                let rotation =pc.rotation * xr * yr; 
+                pc.rotation = rotation;
+                // let translation = transform.rotation * Vec3::new(xp, zp, -yp) * 0.3;
+                pc.position += rotation * Vec3::new(xp, zp, -yp);
             }
             Err(e) => {
                 println!("{:?}", e);                
