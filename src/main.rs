@@ -37,6 +37,7 @@ mod state;
 mod chunks;
 mod pbr;
 mod easing;
+mod projections;
 
 fn main() {
     App::build()

@@ -4,9 +4,9 @@ uuid = "2642b340-7267-4b72-8af7-bb4f279508dd"
 unlit = false
 color = [ 0, 0, 255 ]
 emissive = [ 0, 0, 0 ]
-metalic = 0
-roughness = 255
-reflectance = 0
+metalic = 128
+roughness = 128
+reflectance = 128
 
 
 [green]
@@ -14,7 +14,7 @@ id = 1
 uuid = "2642b340-7267-4b72-8af7-bb4f279508dd"
 unlit = false
 color = [ 0, 255, 0 ]
-emissive = [ 0, 0, 0 ]
+emissive = [ 0, 255, 0 ]
 metalic = 0
 roughness = 0
 reflectance = 0
