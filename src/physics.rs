@@ -1,3 +1,5 @@
+use bevy::prelude::*;
+
 
 
 
@@ -149,3 +151,38 @@
 //         });
 //     });
 // }
+
+pub struct Heat {
+    pub temperature: f32
+}
+
+pub fn black_body(
+    mut heat_query: Query<(&Heat), (With<Heat>)>,
+) {
+    for (h) in heat_query.iter_mut() {
+        if h.temperature > 3000.0 {
+            let e = plancks_law_rgb(h.temperature);
+            println!("emissive: {:?}", e);
+        }
+    }
+}
+
+static PLANCK_CONSTANT: f64 = 6.62607015e-34;
+static SPEED_OF_LIGHT: f64 = 299792458.0;
+static BOLTZMANN_CONSTANT: f64 =  1.380649e-23;
+pub fn plancks_law_rgb(t: f32) -> Color {
+    let r = 5310339.90294 * plancks_law(4.62e14, t as f64) as f32;
+    let g = 5310339.90294 * plancks_law(5.45e14, t as f64) as f32;
+    let b = 5310339.90294 * plancks_law(6.66e14, t as f64) as f32;
+
+    // println!("emissive: {:?}, {:?}, {:?}", r, g, b);
+
+    return Color::rgb(r, g, b);
+}
+pub fn plancks_law(f: f64, t: f64) -> f64 {
+    let top = 2.0 * PLANCK_CONSTANT * f.powi(3) / SPEED_OF_LIGHT.powi(2);
+    let bottom = (PLANCK_CONSTANT*f/(BOLTZMANN_CONSTANT * t)).exp() - 1.0;
+    let res = top / bottom ;
+
+    return res;
+}

@@ -72,6 +72,8 @@ fn main() {
 
         .add_system(chunks::voxel_debug.system())
 
+        .add_system(physics::black_body.system())
+
         //Start game
         .run();
 }

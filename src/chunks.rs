@@ -137,7 +137,7 @@ pub fn setup_material_mappings(
 pub fn create_voxels<'a>(
     mut commands: Commands,
     mut voxel_chunk_tasks: Query<(Entity, &mut Task<VoxelChunk>)>,
-
+    mut materials: ResMut<Assets<StandardMaterial>>,
     // chunk_query: Query<&VoxelChunk, With<VoxelChunk>>,
     box_mesh_handle: Res<BoxMeshHandle>,
 	material_mapping: Res<MaterialsMapping>,
@@ -154,6 +154,7 @@ pub fn create_voxels<'a>(
                     .with_children(|parent| {
                         for voxel in voxels {
                             if let Some(m) = material_mapping.map.get(&voxel.pbr_id) {
+                                let tmp = (voxel.pbr_id as f32);
                                 // println!("{:?}", voxel.position);
                                 let pos = voxel.position.clone();
                                 parent
@@ -165,9 +166,16 @@ pub fn create_voxels<'a>(
                                             is_transparent: false,
                                         },
                                         mesh: box_mesh_handle.0.clone(),
-                                        material:  m.value().clone(),
+                                        material:  materials.add(StandardMaterial {
+                                            emissive: crate::physics::plancks_law_rgb(6200.0 * tmp),
+                                            ..Default::default()
+                                        }),
+                                        // m.value().clone(),
                                         global_transform: GlobalTransform::from_translation(vc_pos + pos),
                                         ..Default::default()
+                                    })
+                                    .insert(crate::physics::Heat {  
+                                        temperature: 6200.0 * tmp
                                     })
                                     .insert(bevy_frustum_culling::aabb::Aabb::default());
                             }
