@@ -1,7 +1,11 @@
-use bevy::math::Vec2;
+use bevy::prelude::*;
+use bevy::math::{Vec2, Vec3};
 
-static SUN_MASS: f64 = 1.989e30;
-static SUN_RADIUS: f64 = 696340000.0;
+static SUN_MASS: f64 = 1.989e30;        //Kg
+static SUN_RADIUS: f64 = 696340000.0;   //m
+static SUN_LUMINOSITY: f64 = 3.828e26;  //W
+static SUN_TEMPERATURE: f64 = 5778.0;   //K
+
 static AU: f64 = 1.496e8;
 static EARTH_MASS: f64 = 5.9722e24;
 
@@ -46,14 +50,24 @@ fn planet_density_distribution(d: f64) -> f64 {
 }
 
 fn star_luminosity(m: f64) -> f64 {
-    m.powf(3.5)
+    return SUN_LUMINOSITY * (m / SUN_MASS) *  m.powf(3.5);
+}
+
+fn star_temperature(m: f64) -> f64 {
+    return SUN_TEMPERATURE * (m / SUN_MASS) *  m.powf(3.5);
+}
+
+fn luminosity_at(p: Vec3, sun_p: Vec3, m: f64) -> f64 {
+    let l = star_luminosity(m);
+    let d = p.distance(sun_p) as f64;
+    return l / (4.0 * std::f64::consts::PI * d * d);
 }
 
 /*
  * Takes star mass and scales acording to luminosity
  */
-fn scale_to_luminosity(m: f64) -> f64 {
-    AU * star_luminosity(m)
+ fn scale_to_luminosity(m: f64) -> f64 {
+    return AU * star_luminosity(m);
 }
 
 /*
@@ -102,3 +116,119 @@ fn star_radius(m: f64) -> f64 {
     m.powf(e as f64) as f64
 }
 
+struct Star {
+    pub position: Vec3,
+    pub mass: f64,            //Kg
+    radius: Option<f64>,      //m
+    temperature: Option<f64>, //Kelvin
+    luminosity: Option<f64>,  //Watt
+    color: Option<Color>,
+    // pub cycle: f64                //% of max luminosity
+}
+
+impl Star {
+    fn radius(&mut self) -> f64 {
+        if self.radius.is_none() {
+            self.radius = Some(star_radius(self.mass));
+        }
+
+        return self.radius.unwrap();
+    }
+
+    fn luminosity(&mut self) -> f64 {
+        if self.luminosity.is_none() {
+            self.luminosity = Some(star_luminosity(self.mass));
+        }
+
+        return self.luminosity.unwrap();
+    }
+
+    fn luminosity_at(&mut self, p: Vec3) -> f64 {
+        if self.luminosity.is_none() {
+            self.luminosity = Some(star_luminosity(self.mass));
+        }
+
+        return luminosity_at(p, self.position, self.mass);
+    }
+
+    fn temperature(&mut self) -> f64 {
+        if self.temperature.is_none() {
+            self.temperature = Some(star_temperature(self.mass));
+        }
+
+        return self.temperature.unwrap();
+    }
+
+    fn color(&mut self) -> Color {
+        if self.color.is_none() {
+            self.color = Some(crate::physics::plancks_law_rgb(self.temperature()));
+        }
+
+        return self.color.unwrap();
+    }
+
+    fn pbr(&mut self) -> StandardMaterial {
+        return StandardMaterial {
+            base_color: self.color(),
+            emissive: self.color(),
+            double_sided: false,
+           
+            ..Default::default()
+        };
+    }
+}
+
+impl Default for Star {
+    fn default() -> Self {
+        Self { 
+            position: Vec3::ZERO,
+            mass: SUN_MASS,
+            radius: Some(SUN_RADIUS),
+            temperature: Some(SUN_TEMPERATURE),
+            luminosity: Some(SUN_LUMINOSITY),
+            color: Some(crate::physics::plancks_law_rgb(SUN_TEMPERATURE))
+        }
+    }
+}
+
+
+
+
+pub fn create(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    // let k = 10000.0;
+    let mut sun = Star {
+        // radius: Some(1.0),
+        // position: Vec3::new(10.0, 0.0, 0.0),
+        ..Default::default()
+    };
+
+    commands
+        .spawn()
+        .insert_bundle(PbrBundle {
+            visible: Visible {
+                is_visible: true,
+                is_transparent: true,
+            },
+            mesh: meshes.add(Mesh::from(shape::Icosphere { radius: sun.radius() as f32, subdivisions: 10 })),
+            material:  materials.add(sun.pbr()),
+            // m.value().clone(),
+            global_transform: GlobalTransform::from_translation(sun.position),
+            ..Default::default()
+        })
+        .insert_bundle(LightBundle {
+            light: Light {
+                color: sun.color(),
+                fov: f32::to_radians(360.0),
+                intensity: sun.luminosity() as f32,
+                range: f32::MAX,
+                ..Default::default()
+            },
+            transform: Transform::from_translation(sun.position),
+            ..Default::default()
+        })
+        .insert(GlobalTransform::from_translation(sun.position));
+}

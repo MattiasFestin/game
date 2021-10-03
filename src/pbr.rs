@@ -128,7 +128,6 @@ pub fn load_materials(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let box_mesh_handle = meshes.add(Mesh::from(bevy::prelude::shape::Cube { size: 1.0 }));
-
     commands.insert_resource(BoxMeshHandle(box_mesh_handle));
 
     let cwd = std::env::current_dir().unwrap().display().to_string();

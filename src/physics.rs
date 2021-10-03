@@ -40,7 +40,7 @@ use bevy::prelude::*;
 }*/
 
 pub struct Heat {
-    pub temperature: f32
+    pub temperature: f64
 }
 
 pub fn black_body(
@@ -57,10 +57,10 @@ pub fn black_body(
 static PLANCK_CONSTANT: f64 = 6.62607015e-34;
 static SPEED_OF_LIGHT: f64 = 299792458.0;
 static BOLTZMANN_CONSTANT: f64 =  1.380649e-23;
-pub fn plancks_law_rgb(t: f32) -> Color {
-    let r = 5310339.90294 * plancks_law(4.62e14, t as f64) as f32;
-    let g = 5310339.90294 * plancks_law(5.45e14, t as f64) as f32;
-    let b = 5310339.90294 * plancks_law(6.66e14, t as f64) as f32;
+pub fn plancks_law_rgb(t: f64) -> Color {
+    let r = 5310339.90294 * plancks_law(4.62e14, t) as f32;
+    let g = 5310339.90294 * plancks_law(5.45e14, t) as f32;
+    let b = 5310339.90294 * plancks_law(6.66e14, t) as f32;
 
     // println!("emissive: {:?}, {:?}, {:?}", r, g, b);
 

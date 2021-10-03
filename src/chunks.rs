@@ -154,7 +154,7 @@ pub fn create_voxels<'a>(
                     .with_children(|parent| {
                         for voxel in voxels {
                             if let Some(m) = material_mapping.map.get(&voxel.pbr_id) {
-                                let tmp = (voxel.pbr_id as f32);
+                                let tmp = (voxel.pbr_id as f64);
                                 // println!("{:?}", voxel.position);
                                 let pos = voxel.position.clone();
                                 parent
