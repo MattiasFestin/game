@@ -40,6 +40,7 @@ mod pbr;
 mod easing;
 mod projections;
 mod bsp;
+mod procedual;
 
 fn main() {
     App::build()

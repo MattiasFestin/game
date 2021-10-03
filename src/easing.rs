@@ -1,4 +1,4 @@
-use bevy::math::{Quat, Vec3};
+use bevy::math::{Quat, Vec2, Vec3};
 
 pub fn scale(y: f32, a: f32) -> f32 {
     y * a
@@ -26,6 +26,10 @@ pub fn mix(y1: f32, y2: f32, blend: f32) -> f32 {
 
 pub fn smooth_step<const N: i32>(x: f32) -> f32 {
     mix(smooth_start::<N>(x), smooth_stop::<N>(x), x)
+}
+
+pub fn lerp(start: Vec2, end: Vec2, x: f32) -> f32 {
+    start.lerp(end, x).y
 }
 
 pub fn asymptotic_averaging(current: f32, target: f32, speed: f32) -> f32 {

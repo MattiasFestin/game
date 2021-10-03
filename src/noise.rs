@@ -27,6 +27,10 @@ pub fn noise_3d(x: u64, y: u64, z: u64, seed: u64) -> u64 {
     return squirrel3(x.wrapping_add(y.wrapping_mul(PRIME_Y)).wrapping_add(z.wrapping_mul(PRIME_Z)), seed);
 }
 
+pub fn noise_1d_f64_normalized(x: f64, seed: u64) -> f64 {
+    return (squirrel3(x as u64, seed) as f64) / (u64::MAX as f64);
+}
+
 #[cfg(test)]
 mod tests {
     extern crate test;
