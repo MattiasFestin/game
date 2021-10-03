@@ -4,8 +4,11 @@ use bevy::render::camera::Camera;
 use bevy::{math::Vec3};
 use bevy_frustum_culling::FrustumCulling;
 
+use crate::constants::GLOBAL_SCALE;
+
 pub fn setup_camera(mut commands: Commands) {
-    let t = Transform::from_translation(Vec3::new(0.0, 0.0, 20.0)).looking_at(Vec3::ZERO, Vec3::Y);
+    let t = Transform::from_translation(Vec3::new(100.0, 0.0, 0.0))
+        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y);
     commands
         .spawn()
         .insert_bundle(PerspectiveCameraBundle {
@@ -14,6 +17,8 @@ pub fn setup_camera(mut commands: Commands) {
         .insert(PlayerCamera {
             position: t.translation,
             rotation: t.rotation,
+
+            position_speed: 10000.0,
             ..Default::default()
         })
         .insert(FrustumCulling);
@@ -59,7 +64,7 @@ pub fn update_camera(
             t.rotation = pc.rotation;
         }
 
-        if t.translation.distance(pc.position) < 10.0 {
+        if t.translation.distance(pc.position) < 100.0 {
             t.translation = crate::easing::asymptotic_averaging_3d(
                 t.translation, 
                 pc.position, 

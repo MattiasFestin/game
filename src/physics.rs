@@ -62,9 +62,7 @@ pub fn plancks_law_rgb(t: f64) -> Color {
     let g = 5310339.90294 * plancks_law(5.45e14, t) as f32;
     let b = 5310339.90294 * plancks_law(6.66e14, t) as f32;
 
-    // println!("emissive: {:?}, {:?}, {:?}", r, g, b);
-
-    return Color::rgb(r, g, b);
+    return Color::rgb(r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0));
 }
 pub fn plancks_law(f: f64, t: f64) -> f64 {
     let top = 2.0 * PLANCK_CONSTANT * f.powi(3) / SPEED_OF_LIGHT.powi(2);

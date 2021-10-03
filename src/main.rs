@@ -18,6 +18,9 @@ extern crate rand;
 extern crate lru;
 extern crate dashmap;
 extern crate bvh;
+extern crate bevy_mod_raycast;
+extern crate bevy_mod_picking;
+
 
 use chunks::create_voxels;
 use chunks::load_chunk;
@@ -59,7 +62,7 @@ fn main() {
         .add_startup_system(camera::setup_camera.system())
 
         .add_startup_system(load_materials.system())
-        .add_startup_system(setup_env.system())
+        // .add_startup_system(setup_env.system())
 
         //Input register
         .init_resource::<input::GamepadLobby>()
@@ -70,8 +73,8 @@ fn main() {
         .add_system(camera::update_camera.system())
 
         
-		.add_system(load_chunk.system())
-        .add_system(create_voxels.system())
+		// .add_system(load_chunk.system())
+        // .add_system(create_voxels.system())
 
         .add_system(chunks::voxel_debug.system())
 
@@ -83,12 +86,12 @@ fn main() {
 }
 
 
-fn setup_env(
-    mut commands: Commands,
-) {
-    // lights
-    commands.spawn_bundle(LightBundle {
-        transform: Transform::from_translation(Vec3::new(0.8, 0.8, 0.8)),
-        ..Default::default()
-    });
-}
+// fn setup_env(
+//     mut commands: Commands,
+// ) {
+//     // lights
+//     commands.spawn_bundle(LightBundle {
+//         transform: Transform::from_translation(Vec3::new(0.8, 0.8, 0.8)),
+//         ..Default::default()
+//     });
+// }

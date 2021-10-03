@@ -15,6 +15,8 @@ pub const GRAVITY_MIN_DISTANCE: f32 = 1.0;
 pub const GRAVITY_MAX_DISTANCE: f32 = 150.0e9;
 
 pub const PHYSICS_TICKS: f64 = 0.03333333333;
-pub const PHYSICS_GRAVITY: f32 = 6.67430e-11;
+pub const PHYSICS_GRAVITY: f64 = 6.67430e-11;
 
 pub const PHYSICS_C: f32 = 299792458.0;
+
+pub const GLOBAL_SCALE: f32 = 1.0e10;
