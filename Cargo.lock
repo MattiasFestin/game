@@ -1729,6 +1729,7 @@ dependencies = [
  "core_simd",
  "dashmap",
  "futures-lite",
+ "glsl-include",
  "lru",
  "num_cpus",
  "rand",
@@ -1978,6 +1979,16 @@ dependencies = [
  "slotmap",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "glsl-include"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daa2afb1631e7ab4543e0dde0e3fc68bb49c58fee89c07f30a26553b1f684ab6"
+dependencies = [
+ "lazy_static",
+ "regex",
 ]
 
 [[package]]

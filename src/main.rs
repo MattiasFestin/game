@@ -20,6 +20,7 @@ extern crate dashmap;
 extern crate bvh;
 extern crate bevy_mod_raycast;
 extern crate bevy_mod_picking;
+extern crate glsl_include;
 
 
 use chunks::create_voxels;
