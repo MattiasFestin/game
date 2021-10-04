@@ -80,7 +80,7 @@ fn main() {
         // .add_system(chunks::voxel_debug.system())
         
         .add_asset::<shaders::MyMaterial>()
-        .add_system(shaders::setup_shader.system())
+        .add_startup_system(shaders::setup_shader.system())
 
         // .add_system(physics::black_body.system())
         // .add_startup_system(procedual::solar_system::create.system())
