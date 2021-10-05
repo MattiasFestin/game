@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+#![feature(const_type_id)]
 #![feature(portable_simd)]
 #![feature(test)]
 
@@ -22,6 +23,7 @@ extern crate bvh;
 extern crate bevy_mod_raycast;
 extern crate bevy_mod_picking;
 extern crate glsl_include;
+extern crate convert_case;
 
 
 use chunks::create_voxels;
@@ -47,6 +49,7 @@ mod projections;
 mod bsp;
 mod procedual;
 mod shaders;
+mod utils;
 
 fn main() {
     App::build()

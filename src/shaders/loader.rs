@@ -1,5 +1,7 @@
 
-use bevy::{prelude::*, render::shader::ShaderStage};
+use bevy::{prelude::*, reflect::TypeUuid, render::{pipeline::{PipelineDescriptor, RenderPipeline}, render_graph::{AssetRenderResourcesNode, RenderGraph}, renderer::RenderResources, shader::{ShaderStage, ShaderStages}}};
+use crate::utils::reflection::Reflectable;
+
 
 #[derive(Debug)]
 pub struct ShaderConfig {
@@ -10,7 +12,8 @@ pub struct ShaderConfig {
 
 #[derive(new, Debug)]
 pub struct ShaderConfigBundle {
-	pub vertex: ShaderConfig,
+	#[new(value = "None")]
+	pub vertex: Option<ShaderConfig>,
 	#[new(value = "None")]
 	pub fragment: Option<ShaderConfig>,
 	#[new(value = "None")]
@@ -44,14 +47,21 @@ pub fn load_shader(
 		}
 	}
 
-	let vertex_source = std::fs::read_to_string(base_path.join(format!("{0}/{0}.vert", name))).unwrap();
-	let vertex_source = veretex_include.expand(vertex_source).unwrap();
+	
+	let mut shader_bundle = ShaderConfigBundle::new();
+	
+	let vertex_path = base_path.join(format!("{0}/{0}.vert", name));
+	if vertex_path.exists() {
+		let vertex_source = std::fs::read_to_string(vertex_path).unwrap();
+		let vertex_source = veretex_include.expand(vertex_source).unwrap();
 
-	let mut shader_bundle = ShaderConfigBundle::new(ShaderConfig {
-		name: format!("{}.vert", name),
-		source: vertex_source.clone(),
-		shader: shaders.add(Shader::from_glsl(ShaderStage::Vertex, &vertex_source))
-	});
+		shader_bundle.vertex = Some(ShaderConfig {
+			name: format!("{}.vert", name),
+			source: vertex_source.clone(),
+			shader: shaders.add(Shader::from_glsl(ShaderStage::Vertex, &vertex_source))
+		});
+	}
+	
 
 	let fragment_path = base_path.join(format!("{0}/{0}.frag", name));
 	if fragment_path.exists() {
@@ -78,4 +88,41 @@ pub fn load_shader(
 	}
 
 	return shader_bundle;
+}
+
+pub fn setup_material<T: TypeUuid + RenderResources + Reflectable + Sync + Send + 'static>(
+	mut pipelines: ResMut<Assets<PipelineDescriptor>>,
+	mut render_graph: ResMut<RenderGraph>,
+	shaders: ResMut<Assets<Shader>>,
+) -> Option<RenderPipeline> {
+	let name = T::struct_name();
+
+	let shader_bundle = load_shader(&name, shaders);
+
+    if shader_bundle.vertex.is_some() {
+        // Create a new shader pipeline
+        let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
+            vertex: shader_bundle.vertex.unwrap().shader,
+            fragment: shader_bundle.fragment.map(|x| x.shader)
+        }));
+
+        // Add an AssetRenderResourcesNode to our Render Graph. This will bind MyMaterial resources to
+        // our shader
+        render_graph.add_system_node( 
+            name,
+            AssetRenderResourcesNode::<T>::new(true),
+        );
+
+        // Add a Render Graph edge connecting our new "my_material" node to the main pass node. This
+        // ensures "my_material" runs before the main pass
+        render_graph
+            .add_node_edge(name, bevy::render::render_graph::base::node::MAIN_PASS)
+            .unwrap();
+
+		return Some(RenderPipeline::new(
+			pipeline_handle,
+		));
+    }
+
+	return None;
 }
