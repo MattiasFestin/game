@@ -6,6 +6,7 @@
 extern crate bevy;
 // #[macro_use] extern crate bevycheck;
 #[macro_use] extern crate serde;
+#[macro_use] extern crate derive_new;
 extern crate bevy_mod_bounding;
 extern crate bevy_frustum_culling;
 // extern crate bevy_world_to_screenspace;
