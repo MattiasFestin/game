@@ -1,61 +1,63 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
 
+use bevy::asset::Asset;
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::pipeline::PipelineDescriptor;
+use bevy::render::pipeline::{PipelineDescriptor, RenderPipeline};
 use bevy::render::renderer::RenderResources;
 use bevy::render::render_graph::RenderGraph;
-use convert_case::{Case, Casing};
 
 use crate::utils::reflection::Reflectable;
 
 pub mod loader;
 
-#[derive(RenderResources, Default, TypeUuid)]
-#[uuid = "945ccb13-4b67-4464-aa75-e8abc436ec29"]
-pub struct MyMaterial {
-    pub color: Color,
-}
-
-impl Reflectable for MyMaterial {
-    fn struct_name() -> &'static str {
-        return &"my_material";
-    }
-
-    fn field_names() -> &'static [&'static str] {
-        return &["color"];
+crate::resource!{
+    #[uuid = "11c82e72-b7b5-433f-8fa1-440796c714aa"]
+    struct MyMaterial {
+        value: f32
     }
 }
 
-// reflectable!{
-//     struct MyMaterial {
-//         pub color: Color,
-//     }
-// }
 
-pub fn setup_shader(
+pub struct ShaderCache {
+    pub cache: HashMap<String, RenderPipeline>
+}
+
+impl Default for ShaderCache {
+    fn default() -> Self {
+        Self { cache: Default::default() }
+    }
+}
+
+pub fn add_shader<T:  TypeUuid + Default + RenderResources + Reflectable + Clone + Asset + Sync + Send + 'static>(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<MyMaterial>>,
+    cache: ResMut<ShaderCache>,
+	mut materials: ResMut<Assets<T>>,
 	pipelines: ResMut<Assets<PipelineDescriptor>>,
 	render_graph: ResMut<RenderGraph>,
 	shaders: ResMut<Assets<Shader>>,
 ) {
-    if let Some(render_pipeline) = loader::setup_material::<MyMaterial>(pipelines, render_graph, shaders) {
-        // Create a new material
-        let material = materials.add(MyMaterial {
-            color: Color::rgb(0.0, 0.8, 0.0),
-        });
-
+    if let Some(render_pipeline) = loader::setup_material::<T>(cache, pipelines, render_graph, shaders) {
         commands
             .spawn_bundle(MeshBundle {
-                mesh: meshes.add(Mesh::from(shape::Cube { size: 2.0 })),
+                mesh: meshes.add(Mesh::from(shape::Icosphere{ radius: 2.0, subdivisions: 2 })),
                 render_pipelines: RenderPipelines::from_pipelines(vec![render_pipeline]),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 ..Default::default()
             })
-            .insert(material);
+            .insert(materials.add(T::default()));
+            // .insert(MyMaterial { value: 0.0 });
+    } else {
+        info!("No shaders found for {}", MyMaterial::struct_name());
+    }
+}
+
+pub fn test(
+    time: Res<Time>,
+    mut q: Query<&mut MyMaterial>,
+) {
+    if let Ok(mut x) = q.single_mut() {
+        x.value = time.seconds_since_startup() as f32;
     }
 }

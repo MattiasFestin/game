@@ -1,5 +1,6 @@
 
 
+use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 use bevy::{input::{Axis, Input}};
@@ -32,15 +33,16 @@ pub fn gamepad_system(
     lobby: Res<GamepadLobby>,
     _button_inputs: Res<Input<GamepadButton>>,
     button_axes: Res<Axis<GamepadButton>>,
+    keyboard_input: Res<Input<KeyCode>>,
     axes: Res<Axis<GamepadAxis>>,
-    time: Res<Time>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
     mut camera_query: Query<&mut crate::camera::PlayerCamera, With<crate::camera::PlayerCamera>>
 ) {
     for gamepad in lobby.gamepads.iter().cloned() {
         match camera_query.single_mut() {
             Ok(mut pc) => {
-                let pos_speed = pc.position_speed * (time.delta_seconds() as f32);
-                let rot_speed = pc.rotation_speed * (time.delta_seconds() as f32);
+                let pos_speed = pc.position_speed;
+                let rot_speed = pc.rotation_speed;
 
                 let mut xr = Quat::IDENTITY;
                 let mut yr = Quat::IDENTITY;
@@ -51,23 +53,41 @@ pub fn gamepad_system(
                     }
                 }
 
+                // if keyboard_input.pressed(KeyCode::A) {
+                //     xr = Quat::from_rotation_y( -rot_speed);
+                // } else if keyboard_input.pressed(KeyCode::D) {
+                //     xr = Quat::from_rotation_y( rot_speed);
+                // }
+
                 if let Some(right_stick_y) = axes.get(GamepadAxis(gamepad, GamepadAxisType::RightStickY)) {
                     if right_stick_y.abs() > 0.1 {
                         yr = Quat::from_rotation_x(right_stick_y * rot_speed);
                     }
                 }
 
+                // if keyboard_input.pressed(KeyCode::W) {
+                //     yr = Quat::from_rotation_x( -rot_speed);
+                // } else if keyboard_input.pressed(KeyCode::S) {
+                //     yr = Quat::from_rotation_x( rot_speed);
+                // }
+
+                for event in mouse_motion_events.iter() {
+                    xr = Quat::from_rotation_x( -event.delta.y * rot_speed);
+                    yr = Quat::from_rotation_y( -event.delta.x * rot_speed);
+                }
+            
+
                 let mut xp = 0f32;
                 if let Some(left_stick_x) = axes.get(GamepadAxis(gamepad, GamepadAxisType::LeftStickX)) {
                     if left_stick_x.abs() > 0.1 {
-                        xp = left_stick_x * (time.delta_seconds() as f32);
+                        xp = left_stick_x * pos_speed;
                     }
                 }
 
                 let mut yp = 0f32;
                 if let Some(left_stick_y) = axes.get(GamepadAxis(gamepad, GamepadAxisType::LeftStickY)) {
                     if left_stick_y.abs() > 0.1 {
-                        yp = left_stick_y * (time.delta_seconds() as f32);
+                        yp = left_stick_y * pos_speed;
                     }
                 }
 
@@ -83,14 +103,31 @@ pub fn gamepad_system(
                             left_trigger = 0.0f32;
                         }
 
-                        zp = (right_trigger - left_trigger) * (time.delta_seconds() as f32);
+                        zp = (right_trigger - left_trigger) * pos_speed;
                     }
                 }
+
+                if keyboard_input.pressed(KeyCode::W) {
+                    yp = 0.50 * pos_speed;
+                } else if keyboard_input.pressed(KeyCode::S) {
+                    yp = -0.50 * pos_speed;
+                }
+
+                if keyboard_input.pressed(KeyCode::D) {
+                    xp = 0.50 * pos_speed;
+                } else if keyboard_input.pressed(KeyCode::A) {
+                    xp = -0.50 * pos_speed;
+                }
+
+                if keyboard_input.pressed(KeyCode::Space) {
+                    zp = 0.50 * pos_speed;
+                } else if keyboard_input.pressed(KeyCode::LControl) {
+                    zp = -0.50 * pos_speed;
+                }
         
-                let rotation = pc.rotation * xr * yr; 
-                pc.rotation = rotation;
-                // let translation = transform.rotation * Vec3::new(xp, zp, -yp) * 0.3;
-                pc.position += rotation * Vec3::new(xp, zp, -yp) * pos_speed;
+                pc.rotation *= xr * yr;
+                let rotation = pc.rotation;
+                pc.position += rotation * Vec3::new(xp, zp, -yp);
             }
             Err(e) => {
                 println!("{:?}", e);                

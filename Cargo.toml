@@ -30,7 +30,6 @@ bevy_mod_raycast = "0.2"
 bevy_mod_picking = "0.4"
 glsl-include = "0.3.1"
 derive-new = "0.5"
-convert_case = "0.4"
 
 [profile.dev.package."*"]
 opt-level = 3

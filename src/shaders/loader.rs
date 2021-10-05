@@ -1,4 +1,6 @@
 
+use std::collections::HashMap;
+
 use bevy::{prelude::*, reflect::TypeUuid, render::{pipeline::{PipelineDescriptor, RenderPipeline}, render_graph::{AssetRenderResourcesNode, RenderGraph}, renderer::RenderResources, shader::{ShaderStage, ShaderStages}}};
 use crate::utils::reflection::Reflectable;
 
@@ -91,37 +93,42 @@ pub fn load_shader(
 }
 
 pub fn setup_material<T: TypeUuid + RenderResources + Reflectable + Sync + Send + 'static>(
+	mut shader_cache: ResMut<super::ShaderCache>,
 	mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 	mut render_graph: ResMut<RenderGraph>,
 	shaders: ResMut<Assets<Shader>>,
 ) -> Option<RenderPipeline> {
 	let name = T::struct_name();
 
+	if shader_cache.cache.contains_key(name) {
+		return Some(shader_cache.cache[name].clone());
+	}
+
 	let shader_bundle = load_shader(&name, shaders);
 
     if shader_bundle.vertex.is_some() {
-        // Create a new shader pipeline
         let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {
             vertex: shader_bundle.vertex.unwrap().shader,
             fragment: shader_bundle.fragment.map(|x| x.shader)
         }));
 
-        // Add an AssetRenderResourcesNode to our Render Graph. This will bind MyMaterial resources to
-        // our shader
         render_graph.add_system_node( 
             name,
             AssetRenderResourcesNode::<T>::new(true),
         );
 
-        // Add a Render Graph edge connecting our new "my_material" node to the main pass node. This
-        // ensures "my_material" runs before the main pass
         render_graph
             .add_node_edge(name, bevy::render::render_graph::base::node::MAIN_PASS)
             .unwrap();
 
-		return Some(RenderPipeline::new(
+
+		let render_pipe = RenderPipeline::new(
 			pipeline_handle,
-		));
+		);
+
+		shader_cache.cache.insert(name.to_string(), render_pipe.clone());
+
+		return Some(render_pipe);
     }
 
 	return None;
