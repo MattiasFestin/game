@@ -1,7 +1,7 @@
 
 use std::collections::HashMap;
 
-use bevy::{prelude::*, reflect::TypeUuid, render::{pipeline::{PipelineDescriptor, RenderPipeline}, render_graph::{AssetRenderResourcesNode, RenderGraph}, renderer::RenderResources, shader::{ShaderStage, ShaderStages}}};
+use bevy::{prelude::*, reflect::TypeUuid, render::{pipeline::{PipelineDescriptor, RenderPipeline}, render_graph::{AssetRenderResourcesNode, RenderGraph, RenderResourcesNode}, renderer::RenderResources, shader::{ShaderStage, ShaderStages}}};
 use crate::utils::reflection::Reflectable;
 
 
@@ -92,7 +92,7 @@ pub fn load_shader(
 	return shader_bundle;
 }
 
-pub fn setup_material<T: TypeUuid + RenderResources + Reflectable + Sync + Send + 'static>(
+pub fn setup_material<T: TypeUuid + RenderResources + Reflectable>(
 	mut shader_cache: ResMut<super::ShaderCache>,
 	mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 	mut render_graph: ResMut<RenderGraph>,
@@ -114,7 +114,7 @@ pub fn setup_material<T: TypeUuid + RenderResources + Reflectable + Sync + Send 
 
         render_graph.add_system_node( 
             name,
-            AssetRenderResourcesNode::<T>::new(true),
+            RenderResourcesNode::<T>::new(true),
         );
 
         render_graph

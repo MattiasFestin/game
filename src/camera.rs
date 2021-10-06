@@ -42,7 +42,7 @@ impl Default for PlayerCamera {
             rotation_easing: 10.0,
             position_easing: 2.0,
             
-            rotation_speed: 0.01,
+            rotation_speed: 0.1,
             position_speed: 1.0
         }
     }

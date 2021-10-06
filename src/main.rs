@@ -86,10 +86,10 @@ fn main() {
         // .add_system(chunks::voxel_debug.system())
 
         //TODO: Load shaders via plugin
-        .add_asset::<shaders::MyMaterial>()
+        // .add_asset::<shaders::MyMaterial>()
         .insert_resource(shaders::ShaderCache::default())
         .add_startup_system(shaders::add_shader::<shaders::MyMaterial>.system())
-        .add_system(shaders::test.system())
+        .add_system(shaders::animate_shader.system())
 
         // .add_system(physics::black_body.system())
         // .add_startup_system(procedual::solar_system::create.system())

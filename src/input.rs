@@ -33,9 +33,7 @@ pub fn gamepad_system(
     lobby: Res<GamepadLobby>,
     _button_inputs: Res<Input<GamepadButton>>,
     button_axes: Res<Axis<GamepadButton>>,
-    keyboard_input: Res<Input<KeyCode>>,
     axes: Res<Axis<GamepadAxis>>,
-    mut mouse_motion_events: EventReader<MouseMotion>,
     mut camera_query: Query<&mut crate::camera::PlayerCamera, With<crate::camera::PlayerCamera>>
 ) {
     for gamepad in lobby.gamepads.iter().cloned() {
@@ -53,30 +51,12 @@ pub fn gamepad_system(
                     }
                 }
 
-                // if keyboard_input.pressed(KeyCode::A) {
-                //     xr = Quat::from_rotation_y( -rot_speed);
-                // } else if keyboard_input.pressed(KeyCode::D) {
-                //     xr = Quat::from_rotation_y( rot_speed);
-                // }
-
                 if let Some(right_stick_y) = axes.get(GamepadAxis(gamepad, GamepadAxisType::RightStickY)) {
                     if right_stick_y.abs() > 0.1 {
                         yr = Quat::from_rotation_x(right_stick_y * rot_speed);
                     }
                 }
-
-                // if keyboard_input.pressed(KeyCode::W) {
-                //     yr = Quat::from_rotation_x( -rot_speed);
-                // } else if keyboard_input.pressed(KeyCode::S) {
-                //     yr = Quat::from_rotation_x( rot_speed);
-                // }
-
-                for event in mouse_motion_events.iter() {
-                    xr = Quat::from_rotation_x( -event.delta.y * rot_speed);
-                    yr = Quat::from_rotation_y( -event.delta.x * rot_speed);
-                }
             
-
                 let mut xp = 0f32;
                 if let Some(left_stick_x) = axes.get(GamepadAxis(gamepad, GamepadAxisType::LeftStickX)) {
                     if left_stick_x.abs() > 0.1 {
@@ -107,6 +87,56 @@ pub fn gamepad_system(
                     }
                 }
 
+                pc.rotation *= xr * yr;
+                let rotation = pc.rotation;
+                pc.position += rotation * Vec3::new(xp, zp, -yp);
+            }
+            Err(e) => {
+                println!("{:?}", e);                
+            }
+        }
+    }
+}
+
+pub fn mouse_keyboard_system(
+    mut windows: ResMut<Windows>,
+    btn: Res<Input<MouseButton>>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut mouse_motion_events: EventReader<MouseMotion>,
+    mut camera_query: Query<&mut crate::camera::PlayerCamera, With<crate::camera::PlayerCamera>>
+) {
+    let window = windows.get_primary_mut().unwrap();
+
+    if btn.just_pressed(MouseButton::Left) {
+        window.set_cursor_lock_mode(true);
+        window.set_cursor_visibility(false);
+    }
+
+    if window.cursor_locked() {
+
+        if keyboard_input.just_pressed(KeyCode::Escape) {
+            window.set_cursor_lock_mode(false);
+            window.set_cursor_visibility(true);
+        }
+
+        match camera_query.single_mut() {
+            Ok(mut pc) => {
+                let pos_speed = pc.position_speed;
+                let rot_speed = pc.rotation_speed;
+
+                let mut xr = Quat::IDENTITY;
+                let mut yr = Quat::IDENTITY;
+
+                for event in mouse_motion_events.iter() {
+                    xr = Quat::from_rotation_x( -event.delta.y * rot_speed);
+                    yr = Quat::from_rotation_y( -event.delta.x * rot_speed);
+                }
+            
+
+                let mut xp = 0f32;
+                let mut yp = 0f32;
+                let mut zp = 0.0f32;
+                
                 if keyboard_input.pressed(KeyCode::W) {
                     yp = 0.50 * pos_speed;
                 } else if keyboard_input.pressed(KeyCode::S) {
@@ -133,23 +163,5 @@ pub fn gamepad_system(
                 println!("{:?}", e);                
             }
         }
-    }
-}
-
-pub fn mouse_keyboard_system(
-    mut windows: ResMut<Windows>,
-    btn: Res<Input<MouseButton>>,
-    key: Res<Input<KeyCode>>,
-) {
-    let window = windows.get_primary_mut().unwrap();
-
-    if btn.just_pressed(MouseButton::Left) {
-        window.set_cursor_lock_mode(true);
-        window.set_cursor_visibility(false);
-    }
-
-    if key.just_pressed(KeyCode::Escape) {
-        window.set_cursor_lock_mode(false);
-        window.set_cursor_visibility(true);
     }
 }
