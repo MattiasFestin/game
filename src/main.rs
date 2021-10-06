@@ -54,7 +54,7 @@ mod utils;
 
 fn main() {
     App::build()
-        .insert_resource(Msaa { samples: 4 })
+        .insert_resource(Msaa { samples: 8 })
         .add_plugins(DefaultPlugins)
 
         .add_plugin(LogDiagnosticsPlugin::default())
@@ -73,7 +73,7 @@ fn main() {
 
         //Input register
         .init_resource::<input::GamepadLobby>()
-        .add_system_to_stage(CoreStage::PreUpdate, input::connection_system.system())
+        .add_system_to_stage(CoreStage::PreUpdate, input::gamepad_connection_system.system())
         .add_system(input::gamepad_system.system().label("gamepad"))
         .add_system(input::mouse_keyboard_system.system())
 

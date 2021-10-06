@@ -10,7 +10,7 @@ pub struct GamepadLobby {
     gamepads: HashSet<Gamepad>,
 }
 
-pub fn connection_system(
+pub fn gamepad_connection_system(
     mut lobby: ResMut<GamepadLobby>,
     mut gamepad_event: EventReader<GamepadEvent>,
 ) {
@@ -128,8 +128,8 @@ pub fn mouse_keyboard_system(
                 let mut yr = Quat::IDENTITY;
 
                 for event in mouse_motion_events.iter() {
-                    xr = Quat::from_rotation_x( -event.delta.y * rot_speed);
-                    yr = Quat::from_rotation_y( -event.delta.x * rot_speed);
+                    xr = Quat::from_rotation_x( -event.delta.y * 0.2 * rot_speed);
+                    yr = Quat::from_rotation_y( -event.delta.x * 0.2 * rot_speed);
                 }
             
 

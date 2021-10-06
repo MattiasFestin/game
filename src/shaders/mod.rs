@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use bevy::asset::Asset;
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::pipeline::{PipelineDescriptor, RenderPipeline};
@@ -58,7 +57,7 @@ pub fn add_shader<T:  TypeUuid + Default + RenderResources + Reflectable>(
             .spawn_bundle(MeshBundle {
                 mesh: meshes.add(Mesh::from(shape::Icosphere{ radius: 2.0, subdivisions: 2 })),
                 render_pipelines: RenderPipelines::from_pipelines(vec![render_pipeline]),
-                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                transform: Transform::from_xyz(10.0, 0.0, 0.0),
                 ..Default::default()
             })
             .insert(T::default());

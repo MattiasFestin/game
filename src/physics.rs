@@ -58,9 +58,9 @@ static PLANCK_CONSTANT: f64 = 6.62607015e-34;
 static SPEED_OF_LIGHT: f64 = 299792458.0;
 static BOLTZMANN_CONSTANT: f64 =  1.380649e-23;
 pub fn plancks_law_rgb(t: f64) -> Color {
-    let r = 5310339.90294 * plancks_law(4.62e14, t) as f32;
-    let g = 5310339.90294 * plancks_law(5.45e14, t) as f32;
-    let b = 5310339.90294 * plancks_law(6.66e14, t) as f32;
+    let r = plancks_law(4.62e14, t) as f32;
+    let g = plancks_law(5.45e14, t) as f32;
+    let b = plancks_law(6.66e14, t) as f32;
 
     return Color::rgb(r.clamp(0.0, 1.0), g.clamp(0.0, 1.0), b.clamp(0.0, 1.0));
 }
