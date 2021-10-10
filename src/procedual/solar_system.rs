@@ -139,33 +139,36 @@ fn star_radius(m: f64) -> f64 {
 #[derive(Debug, Clone, Copy)]
 pub struct Star {
     pub id: u64,
+    pub age: f64,
     pub position: Vec3A,
     pub mass: f64,            //Kg
     pub radius: f64,      //m
     pub temperature: f64, //Kelvin
     pub luminosity: f64,  //Watt
-    pub color: Color,
+    // pub color: Color,
     // pub cycle: f64                //% of max luminosity
 }
 
 impl Star {
     fn create(x: u64, y: u64, z: u64, seed: u64) -> Self {
         let id = crate::noise::noise_3d(x, y, z, seed);
-        let mass = MAX_STAR_MASS * ((crate::noise::noise_3d(x, y, z, seed.wrapping_add(id)) as f64) / u64::MAX as f64) + MIN_STAR_MASS;
+        let mass = MAX_STAR_MASS * ((crate::noise::noise_3d(x, y, z, id) as f64) / u64::MAX as f64) + MIN_STAR_MASS;
         let position = Vec3A::new(x as f32, y as f32, z as f32);
+        let age = crate::noise::noise_3d_f64_normalized(x, y, z, mass as u64);
         let radius = star_radius(mass);
         let luminosity = star_luminosity(mass);
         let temperature = star_temperature(mass, radius);
-        let color = crate::physics::plancks_law_rgb(temperature);
+        let color = Color::WHITE;//crate::physics::plancks_law_rgb(temperature);
 
         Self {
             id,
+            age,
             position,
             mass: mass,
             radius,
             temperature,
             luminosity,
-            color
+            // color
         }
     }
 
@@ -175,8 +178,8 @@ impl Star {
 
     fn pbr(&self) -> StandardMaterial {
         return StandardMaterial {
-            base_color: self.color,
-            emissive: self.color,
+            // base_color: self.color,
+            // emissive: self.color,
             double_sided: true,
             reflectance: 0.0,
             roughness: 1.0,
@@ -290,8 +293,8 @@ fn render_solar_system(
     // sun.radius = Some(1.0e2);
     // system.star.position = Vec3A::new(2.0 * system.star.radius as f32, 0.0, -AU as f32) ;
 
-    println!("{:?}", system);
-    
+    info!("system.star.temperature: {}", system.star.temperature);
+
     let mut pos = system.star.position.into();
     pos = pos / GLOBAL_SCALE;
     commands
@@ -304,19 +307,24 @@ fn render_solar_system(
             transform: Transform::from_translation(pos),
             ..Default::default()
         })
-        .insert_bundle(LightBundle {
-            light: Light {
-                color: system.star.color,
-                fov: f32::to_radians(360.0),
-                intensity: 255.0 * (system.star.luminosity / SUN_LUMINOSITY) as f32,
-                range: 1.0,
-                depth: 0.0..f32::MAX,
-                ..Default::default()
-            },
-            global_transform: GlobalTransform::from_translation(pos),
-            transform: Transform::from_translation(pos),
-            ..Default::default()
-        })
+        .insert(
+            crate::physics::BlackBody {
+                temperature: system.star.temperature as f32
+            }
+        )
+        // .insert_bundle(LightBundle {
+        //     light: Light {
+        //         color: system.star.color,
+        //         fov: f32::to_radians(360.0),
+        //         intensity: 255.0 * (system.star.luminosity / SUN_LUMINOSITY) as f32,
+        //         range: 1.0,
+        //         depth: 0.0..f32::MAX,
+        //         ..Default::default()
+        //     },
+        //     global_transform: GlobalTransform::from_translation(pos),
+        //     transform: Transform::from_translation(pos),
+        //     ..Default::default()
+        // })
         .insert(bevy_frustum_culling::aabb::Aabb::default())
         ;
 
@@ -345,15 +353,18 @@ fn render_solar_system(
                 ccd: bevy_rapier3d::prelude::RigidBodyCcd { ccd_enabled: false, ..Default::default() },
                 ..Default::default()
             })
-        // .insert_bundle(bevy_rapier3d::physics::ColliderBundle {
-        //     shape: bevy_rapier3d::prelude::ColliderShape::cuboid(1.0, 1.0, 1.0),
-        //     collider_type: bevy_rapier3d::prelude::ColliderType::Sensor,
-        //     position: ((planet.position / GLOBAL_SCALE).into(), Quat::from_rotation_x(0.0)).into(),
-        //     material: bevy_rapier3d::prelude::ColliderMaterial { friction: 0.7, restitution: 0.3, ..Default::default() },
-        //     mass_properties: bevy_rapier3d::prelude::ColliderMassProps::Density(2.0),
-        //     ..Default::default()
-        // })
+        .insert_bundle(bevy_rapier3d::physics::ColliderBundle {
+            shape: bevy_rapier3d::prelude::ColliderShape::ball((planet.radius as f32) / GLOBAL_SCALE),
+            collider_type: bevy_rapier3d::prelude::ColliderType::Sensor,
+            position: ((planet.position / GLOBAL_SCALE).into(), Quat::from_rotation_x(0.0)).into(),
+            material: bevy_rapier3d::prelude::ColliderMaterial { friction: 0.7, restitution: 0.3, ..Default::default() },
+            mass_properties: bevy_rapier3d::prelude::ColliderMassProps::Density(planet.density as f32),
+            ..Default::default()
+        })
+        .insert(crate::physics::Mass { mass: planet.mass })
+        .insert(crate::physics::Force { force: Vec3::ZERO })
         .insert(bevy_rapier3d::physics::RigidBodyPositionSync::Discrete)
+        .insert(crate::physics::Identity { id: bevy::reflect::Uuid::new_v4() })
         ;
     }
 }
@@ -367,9 +378,9 @@ fn render_solar_system(
 // }
 
 pub fn create(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    commands: Commands,
+    materials: ResMut<Assets<StandardMaterial>>,
+    meshes: ResMut<Assets<Mesh>>,
 ) {
     render_solar_system(commands, materials, meshes);
 }

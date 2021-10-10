@@ -7,6 +7,17 @@
         float x = a*cos(tau*random.x); 
         float y = a*sin(tau*random.x);
         float z = sqrt(1.0-random.y);
+
+        /*
+            For more efficiency we can generate proportionally
+            fewer rays where the cos term is small. That is,
+                pdf(x) = cos (t) / constant
+            where constant = pi, by normalization over hemisphere.
+                Lo = (1 / N) sum [ ((c / pi) Li cos (t)) / (cos(t)/pi) ]
+                = (c / N) sum [Li]
+            Yay!
+            */
+
         return normalize(vec3(x*u+y*v+z*normal));
     }
     //crude ray offset

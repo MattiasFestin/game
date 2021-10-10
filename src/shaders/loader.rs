@@ -70,8 +70,6 @@ pub fn load_shader(
 		let fragment_source = std::fs::read_to_string(fragment_path).unwrap();
 		let fragment_source = fragment_include.expand(fragment_source).unwrap();
 
-		info!("{}", fragment_source.clone());
-
 		shader_bundle.fragment = Some(ShaderConfig {
 			name: format!("{}.frag", name),
 			source: fragment_source.clone(),

@@ -60,10 +60,11 @@ fn main() {
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(RngPlugin::from(42)) //TODO: Seed
-        // .add_plugin(bevy_rapier3d::render::RapierRenderPlugin)
+        .add_plugin(bevy_rapier3d::render::RapierRenderPlugin)
 
-        // .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<bevy_rapier3d::physics::NoUserData>::default())
-        // .add_startup_system(setup_physics.system())
+        .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<bevy_rapier3d::physics::NoUserData>::default())
+        // .add_system(physics::gravity.system())
+        // .add_system(physics::impulse.system())
 
         //Camera
         .add_startup_system(camera::setup_camera.system())
@@ -85,14 +86,11 @@ fn main() {
 
         // .add_system(chunks::voxel_debug.system())
 
-        //TODO: Load shaders via plugin
-        // .add_asset::<shaders::MyMaterial>()
         .insert_resource(shaders::ShaderCache::default())
-        .add_startup_system(shaders::add_shader::<shaders::MyMaterial>.system())
-        .add_system(shaders::animate_shader.system())
+        .add_startup_system(shaders::setup_shader.system())
 
         // .add_system(physics::black_body.system())
-        // .add_startup_system(procedual::solar_system::create.system())
+        .add_startup_system(procedual::solar_system::create.system())
 
         //Start game
         .run();

@@ -1,7 +1,8 @@
 #ifndef LIB_CONSTANTS
 #define LIB_CONSTANTS
     //Math constants
-    #define C_PI 3.1415926535897932384626433832795
+    #define C_PI    3.141592653589793
+    #define C_TAU   6.283185307179586
 
     //physics constants
     #define C_LIGHTSPEED            299792458.0

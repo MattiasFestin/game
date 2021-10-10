@@ -167,7 +167,7 @@ pub fn create_voxels<'a>(
                                         },
                                         mesh: box_mesh_handle.0.clone(),
                                         material:  materials.add(StandardMaterial {
-                                            emissive: crate::physics::plancks_law_rgb(6200.0 * tmp),
+                                            // emissive: crate::physics::plancks_law_rgb(6200.0 * tmp),
                                             ..Default::default()
                                         }),
                                         // m.value().clone(),

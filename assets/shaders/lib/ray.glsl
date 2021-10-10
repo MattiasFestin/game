@@ -8,7 +8,7 @@
         vec3 direction;
     };
 
-    struct Raycastresult{
+    struct Raycastresult {
         bool hit;
         vec3 normal, position;
         Material material;

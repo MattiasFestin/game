@@ -37,3 +37,10 @@ opt-level = 3
 # Maybe also enable only a small amount of optimization for our code:
 [profile.dev]
 opt-level = 1
+
+[profile.dev.package.bevy_rapier3d]
+opt-level = 3
+
+# Add this to your Cargo.toml
+[profile.release]
+codegen-units = 1
