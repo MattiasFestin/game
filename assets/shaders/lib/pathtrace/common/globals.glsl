@@ -117,7 +117,7 @@ struct LightSampleRec
     float pdf;
 };
 
-uniform Camera camera;
+// uniform Camera camera;
 
 //RNG from code by Moroz Mykhailo (https://www.shadertoy.com/view/wltcRS)
 

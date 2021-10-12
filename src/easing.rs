@@ -32,6 +32,11 @@ pub fn lerp(start: Vec2, end: Vec2, x: f32) -> f32 {
     start.lerp(end, x).y
 }
 
+pub fn bias<const N: i32>(x: f32, bias: f32) -> f32 {
+    let k = (1.0-bias).powi(N);
+    return (x * k) / (x * k - x + 1.0);
+}
+
 pub fn asymptotic_averaging(current: f32, target: f32, speed: f32) -> f32 {
     current + (target - current) * speed
 }

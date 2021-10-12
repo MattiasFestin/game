@@ -159,12 +159,6 @@
         return WavelengthToXYZLinear( f );
     }
 
-
-    struct Chromaticities
-    {
-        vec2 R, G, B, W;
-    };
-
     // chromatic adaptation
 
     // http://www.brucelindbloom.com/index.html?Eqn_ChromAdapt.html    

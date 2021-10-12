@@ -1,8 +1,11 @@
 use bevy::pbr::AmbientLight;
 use bevy::prelude::*;
 use bevy::math::{Vec2, Vec3, Vec3A};
+use bevy::render::pipeline::PipelineDescriptor;
+use bevy::render::render_graph::RenderGraph;
 
 use crate::constants::{GLOBAL_SCALE, PHYSICS_GRAVITY};
+use crate::shaders::ShaderCache;
 
 static SUN_MASS: f64 = 1.989e30;        //Kg
 static SUN_RADIUS: f64 = 6.963400e8;   //m
@@ -282,10 +285,15 @@ impl StarSystem {
     }
 }
 
-fn render_solar_system(
+pub fn render_solar_system(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>
+    mut meshes: ResMut<Assets<Mesh>>,
+    shader_cache: ResMut<ShaderCache>,
+    pipelines: ResMut<Assets<PipelineDescriptor>>,
+    render_graph: ResMut<RenderGraph>,
+    shaders: ResMut<Assets<Shader>>,
+    asset_server: ResMut<AssetServer>,
 ) {
     let mut system = StarSystem::create(0, 0, 0, 42);
     system.planets[0].position = Vec3A::new(50.0, 0.0, 0.0) * GLOBAL_SCALE;
@@ -297,36 +305,40 @@ fn render_solar_system(
 
     let mut pos = system.star.position.into();
     pos = pos / GLOBAL_SCALE;
-    commands
-        .spawn()
-        .insert(system.star)
-        .insert_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Icosphere { radius: (system.star.radius as f32) / GLOBAL_SCALE, subdivisions: 10 })),
-            material:  materials.add(system.star.pbr()),
-            global_transform: GlobalTransform::from_translation(pos),
-            transform: Transform::from_translation(pos),
-            ..Default::default()
-        })
-        .insert(
-            crate::physics::BlackBody {
-                temperature: system.star.temperature as f32
-            }
-        )
-        // .insert_bundle(LightBundle {
-        //     light: Light {
-        //         color: system.star.color,
-        //         fov: f32::to_radians(360.0),
-        //         intensity: 255.0 * (system.star.luminosity / SUN_LUMINOSITY) as f32,
-        //         range: 1.0,
-        //         depth: 0.0..f32::MAX,
-        //         ..Default::default()
-        //     },
-        //     global_transform: GlobalTransform::from_translation(pos),
-        //     transform: Transform::from_translation(pos),
-        //     ..Default::default()
-        // })
-        .insert(bevy_frustum_culling::aabb::Aabb::default())
-        ;
+    let mut star_entity = commands
+        .spawn();
+
+        star_entity
+            .insert(system.star)
+            .insert_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Icosphere { radius: (system.star.radius as f32) / GLOBAL_SCALE, subdivisions: 10 })),
+                material:  materials.add(system.star.pbr()),
+                global_transform: GlobalTransform::from_translation(pos),
+                transform: Transform::from_translation(pos),
+                ..Default::default()
+            })
+            .insert(
+                crate::physics::BlackBody {
+                    temperature: system.star.temperature as f32
+                }
+            )
+            // .insert_bundle(LightBundle {
+            //     light: Light {
+            //         color: system.star.color,
+            //         fov: f32::to_radians(360.0),
+            //         intensity: 255.0 * (system.star.luminosity / SUN_LUMINOSITY) as f32,
+            //         range: 1.0,
+            //         depth: 0.0..f32::MAX,
+            //         ..Default::default()
+            //     },
+            //     global_transform: GlobalTransform::from_translation(pos),
+            //     transform: Transform::from_translation(pos),
+            //     ..Default::default()
+            // })
+            .insert(bevy_frustum_culling::aabb::Aabb::default())
+            ;
+
+    crate::shaders::add_shader::<crate::physics::BlackBody>(&mut star_entity, asset_server, shader_cache, pipelines, render_graph, shaders);
 
     for planet in system.planets {
         let mut pos = planet.position.into();
@@ -377,10 +389,14 @@ fn render_solar_system(
 
 // }
 
-pub fn create(
-    commands: Commands,
-    materials: ResMut<Assets<StandardMaterial>>,
-    meshes: ResMut<Assets<Mesh>>,
-) {
-    render_solar_system(commands, materials, meshes);
-}
+// pub fn create(
+//     commands: Commands,
+//     materials: ResMut<Assets<StandardMaterial>>,
+//     meshes: ResMut<Assets<Mesh>>,
+//     shader_cache: ResMut<ShaderCache>,
+//     pipelines: ResMut<Assets<PipelineDescriptor>>,
+//     render_graph: ResMut<RenderGraph>,
+//     shaders: ResMut<Assets<Shader>>,
+// ) {
+//     render_solar_system(commands, materials, meshes, shader_cache, pipelines, render_graph, );
+// }

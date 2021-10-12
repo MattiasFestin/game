@@ -119,49 +119,49 @@ pub fn mouse_keyboard_system(
             window.set_cursor_visibility(true);
         }
 
-        match camera_query.single_mut() {
-            Ok(mut pc) => {
-                let pos_speed = pc.position_speed;
-                let rot_speed = pc.rotation_speed;
+        // match camera_query.single_mut() {
+        //     Ok(mut pc) => {
+        //         let pos_speed = pc.position_speed;
+        //         let rot_speed = pc.rotation_speed;
 
-                let mut xr = Quat::IDENTITY;
-                let mut yr = Quat::IDENTITY;
+        //         let mut xr = Quat::IDENTITY;
+        //         let mut yr = Quat::IDENTITY;
 
-                for event in mouse_motion_events.iter() {
-                    xr = Quat::from_rotation_x( -event.delta.y * 0.2 * rot_speed);
-                    yr = Quat::from_rotation_y( -event.delta.x * 0.2 * rot_speed);
-                }
+        //         for event in mouse_motion_events.iter() {
+        //             xr = Quat::from_rotation_x( -event.delta.y * 0.2 * rot_speed);
+        //             yr = Quat::from_rotation_y( -event.delta.x * 0.2 * rot_speed);
+        //         }
             
 
-                let mut xp = 0f32;
-                let mut yp = 0f32;
-                let mut zp = 0.0f32;
+        //         let mut xp = 0f32;
+        //         let mut yp = 0f32;
+        //         let mut zp = 0.0f32;
                 
-                if keyboard_input.pressed(KeyCode::W) {
-                    yp = 0.50 * pos_speed;
-                } else if keyboard_input.pressed(KeyCode::S) {
-                    yp = -0.50 * pos_speed;
-                }
+        //         if keyboard_input.pressed(KeyCode::W) {
+        //             yp = 0.50 * pos_speed;
+        //         } else if keyboard_input.pressed(KeyCode::S) {
+        //             yp = -0.50 * pos_speed;
+        //         }
 
-                if keyboard_input.pressed(KeyCode::D) {
-                    xp = 0.50 * pos_speed;
-                } else if keyboard_input.pressed(KeyCode::A) {
-                    xp = -0.50 * pos_speed;
-                }
+        //         if keyboard_input.pressed(KeyCode::D) {
+        //             xp = 0.50 * pos_speed;
+        //         } else if keyboard_input.pressed(KeyCode::A) {
+        //             xp = -0.50 * pos_speed;
+        //         }
 
-                if keyboard_input.pressed(KeyCode::Space) {
-                    zp = 0.50 * pos_speed;
-                } else if keyboard_input.pressed(KeyCode::LControl) {
-                    zp = -0.50 * pos_speed;
-                }
+        //         if keyboard_input.pressed(KeyCode::Space) {
+        //             zp = 0.50 * pos_speed;
+        //         } else if keyboard_input.pressed(KeyCode::LControl) {
+        //             zp = -0.50 * pos_speed;
+        //         }
         
-                pc.rotation *= xr * yr;
-                let rotation = pc.rotation;
-                pc.position += rotation * Vec3::new(xp, zp, -yp);
-            }
-            Err(e) => {
-                println!("{:?}", e);                
-            }
-        }
+        //         pc.rotation *= xr * yr;
+        //         let rotation = pc.rotation;
+        //         pc.position += rotation * Vec3::new(xp, zp, -yp);
+        //     }
+        //     Err(e) => {
+        //         println!("{:?}", e);                
+        //     }
+        // }
     }
 }

@@ -24,5 +24,7 @@
     #define  C_V_FREQ 8.102498864865e14
     #define  C_RGB_FREQ vec3(C_R_FREQ, C_G_FREQ, C_B_FREQ)
 
+    #define INFINITY 1.0e30
+
     
 #endif

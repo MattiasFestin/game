@@ -19,12 +19,13 @@ pub struct ShaderCache {
 pub fn register_shaders<T:  TypeUuid + Default + RenderResources + Reflectable>(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
+    asset_server: ResMut<AssetServer>,
     cache: ResMut<ShaderCache>,
 	pipelines: ResMut<Assets<PipelineDescriptor>>,
 	render_graph: ResMut<RenderGraph>,
 	shaders: ResMut<Assets<Shader>>,
 ) {
-    if let Some(render_pipeline) = loader::setup_material::<T>(cache, pipelines, render_graph, shaders) {
+    if let Some(render_pipeline) = loader::setup_material::<T>(asset_server, cache, pipelines, render_graph, shaders) {
         commands
             .spawn_bundle(MeshBundle {
                 mesh: meshes.add(Mesh::from(shape::Icosphere{ radius: 2.0, subdivisions: 2 })),
@@ -38,34 +39,35 @@ pub fn register_shaders<T:  TypeUuid + Default + RenderResources + Reflectable>(
     }
 }
 
-pub fn setup_shader(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    cache: ResMut<ShaderCache>,
-	pipelines: ResMut<Assets<PipelineDescriptor>>,
-	render_graph: ResMut<RenderGraph>,
-	shaders: ResMut<Assets<Shader>>,
-) {
-    let entity = commands
-        .spawn_bundle(MeshBundle {
-            mesh: meshes.add(Mesh::from(shape::Icosphere{ radius: 2.0, subdivisions: 2 })),
-            // render_pipelines: ,
-            transform: Transform::from_xyz(10.0, 0.0, 0.0),
-            ..Default::default()
-        });
+// pub fn setup_shader(
+//     mut commands: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     cache: ResMut<ShaderCache>,
+// 	pipelines: ResMut<Assets<PipelineDescriptor>>,
+// 	render_graph: ResMut<RenderGraph>,
+// 	shaders: ResMut<Assets<Shader>>,
+// ) {
+//     // let entity = commands
+//     //     .spawn_bundle(MeshBundle {
+//     //         mesh: meshes.add(Mesh::from(shape::Icosphere{ radius: 2.0, subdivisions: 2 })),
+//     //         // render_pipelines: ,
+//     //         transform: Transform::from_xyz(10.0, 0.0, 0.0),
+//     //         ..Default::default()
+//     //     });
 
-    add_shader::<crate::physics::BlackBody>(entity, cache, pipelines, render_graph, shaders);
-}
+//     // add_shader::<crate::physics::BlackBody>(entity, cache, pipelines, render_graph, shaders);
+// }
 
 pub fn add_shader<'a, 'b, T:  TypeUuid + Default + RenderResources + Reflectable>(
-	mut commands: EntityCommands<'a, 'b>,
+	mut commands: &mut EntityCommands<'a, 'b>,
+    asset_server: ResMut<AssetServer>,
 	// mut meshes: ResMut<Assets<Mesh>>,
     cache: ResMut<ShaderCache>,
 	pipelines: ResMut<Assets<PipelineDescriptor>>,
 	render_graph: ResMut<RenderGraph>,
 	shaders: ResMut<Assets<Shader>>,
 ) {
-    if let Some(render_pipeline) = loader::setup_material::<T>(cache, pipelines, render_graph, shaders) {
+    if let Some(render_pipeline) = loader::setup_material::<T>(asset_server, cache, pipelines, render_graph, shaders) {
         commands
             .insert(RenderPipelines::from_pipelines(vec![render_pipeline]))
             .insert(T::default());

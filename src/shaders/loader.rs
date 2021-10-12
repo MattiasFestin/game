@@ -1,5 +1,5 @@
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use bevy::{prelude::*, reflect::TypeUuid, render::{pipeline::{PipelineDescriptor, RenderPipeline}, render_graph::{AssetRenderResourcesNode, RenderGraph, RenderResourcesNode}, renderer::RenderResources, shader::{ShaderStage, ShaderStages}}};
 use crate::utils::reflection::Reflectable;
@@ -22,10 +22,30 @@ pub struct ShaderConfigBundle {
 	pub compute: Option<ShaderConfig>,
 }
 
+fn load_lib_folder(mut include: &mut glsl_include::Context, path: PathBuf, root_path: &PathBuf) {
+	for entry in std::fs::read_dir(path).unwrap() {
+		let entry = entry.unwrap();
+		let child_path = entry.path();
+		if child_path.is_file() && child_path.exists() {
+			
+			let filename = child_path.strip_prefix(root_path).unwrap().to_str().unwrap().replace("\\", "/").to_string();
+			
+			let content = std::fs::read_to_string(child_path).unwrap();
+
+			include = include.include(filename.clone(), content.clone());
+		} else if child_path.is_dir() {
+			load_lib_folder(include, child_path, root_path);
+		}
+	}
+}
+
 pub fn load_shader(
 	name: &str,
 	mut shaders: ResMut<Assets<Shader>>,
+	asset_server: ResMut<AssetServer>,
 ) -> ShaderConfigBundle {
+	asset_server.watch_for_changes().unwrap();
+
 	let cwd = std::env::current_dir().unwrap();
 	let base_path = cwd.join("assets/shaders");
 
@@ -36,18 +56,8 @@ pub fn load_shader(
 	let mut veretex_include = vertex.include("", "");
 	let mut fragment_include = fragment.include("", "");
 
-	for entry in std::fs::read_dir(lib_folder).unwrap() {
-		let entry = entry.unwrap();
-		let path = entry.path();
-		if path.is_file() && path.exists() {
-			let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-			
-			let content = std::fs::read_to_string(path).unwrap();
-
-			veretex_include = veretex_include.include(filename.clone(), content.clone());
-			fragment_include = fragment_include.include(filename, content);
-		}
-	}
+	load_lib_folder(veretex_include, lib_folder.clone(), &lib_folder.clone());
+	load_lib_folder(fragment_include, lib_folder.clone(), &lib_folder.clone());
 
 	
 	let mut shader_bundle = ShaderConfigBundle::new();
@@ -93,6 +103,7 @@ pub fn load_shader(
 }
 
 pub fn setup_material<T: TypeUuid + RenderResources + Reflectable>(
+	asset_server: ResMut<AssetServer>,
 	mut shader_cache: ResMut<super::ShaderCache>,
 	mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 	mut render_graph: ResMut<RenderGraph>,
@@ -104,7 +115,7 @@ pub fn setup_material<T: TypeUuid + RenderResources + Reflectable>(
 		return Some(shader_cache.cache[name].clone());
 	}
 
-	let shader_bundle = load_shader(&name, shaders);
+	let shader_bundle = load_shader(&name, shaders, asset_server);
 
     if shader_bundle.vertex.is_some() {
         let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(ShaderStages {

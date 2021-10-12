@@ -51,18 +51,27 @@ mod bsp;
 mod procedual;
 mod shaders;
 mod utils;
+mod path_tracer;
+mod window;
 
 fn main() {
     App::build()
-        .insert_resource(Msaa { samples: 8 })
+        .insert_resource(Msaa { samples: 4 })
+        .insert_resource(WindowDescriptor {
+            title: "I am a window!".to_string(),
+            width: 1920.,
+            height: 1080.,
+            vsync: true,
+            ..Default::default()
+        })
         .add_plugins(DefaultPlugins)
 
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(RngPlugin::from(42)) //TODO: Seed
-        .add_plugin(bevy_rapier3d::render::RapierRenderPlugin)
+        // .add_plugin(RngPlugin::from(42)) //TODO: Seed
+        // .add_plugin(bevy_rapier3d::render::RapierRenderPlugin)
 
-        .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<bevy_rapier3d::physics::NoUserData>::default())
+        // .add_plugin(bevy_rapier3d::physics::RapierPhysicsPlugin::<bevy_rapier3d::physics::NoUserData>::default())
         // .add_system(physics::gravity.system())
         // .add_system(physics::impulse.system())
 
@@ -74,12 +83,19 @@ fn main() {
 
         //Input register
         .init_resource::<input::GamepadLobby>()
-        .add_system_to_stage(CoreStage::PreUpdate, input::gamepad_connection_system.system())
-        .add_system(input::gamepad_system.system().label("gamepad"))
+        // .add_system_to_stage(CoreStage::PreUpdate, input::gamepad_connection_system.system())
+        // .add_system(input::gamepad_system.system().label("gamepad"))
         .add_system(input::mouse_keyboard_system.system())
 
         .add_system(camera::update_camera.system())
 
+        .insert_resource(window::WindowSize::default())
+        .add_system(window::resize_notificator.system())
+        .add_startup_system(window::setup_window.system().label("setup_window"))
+
+        .add_startup_system(crate::path_tracer::path_trace.system().after("setup_window"))
+        .add_system(path_tracer::update_pt.system())
+        // .add_system(crate::path_tracer::update_pt.system())
         
 		// .add_system(load_chunk.system())
         // .add_system(create_voxels.system())
@@ -87,10 +103,11 @@ fn main() {
         // .add_system(chunks::voxel_debug.system())
 
         .insert_resource(shaders::ShaderCache::default())
-        .add_startup_system(shaders::setup_shader.system())
+        
+        // .add_startup_system(shaders::setup_shader.system())
 
         // .add_system(physics::black_body.system())
-        .add_startup_system(procedual::solar_system::create.system())
+        // .add_startup_system(procedual::solar_system::render_solar_system.system())
 
         //Start game
         .run();

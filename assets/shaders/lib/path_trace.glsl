@@ -1,12 +1,12 @@
 #ifndef LIB_PATHTRACE
 #define LIB_PATHTRACE
     vec3 cosineWeightedSample(vec3 normal, vec2 random){
-        vec3 u = normalize(cross(normal,vec3(1.0,1.0,1.0)));
+        vec3 u = normalize(cross(normal, vec3(1.0,1.0,1.0)));
         vec3 v = cross(u,normal);
         float a = sqrt(random.y);
-        float x = a*cos(tau*random.x); 
-        float y = a*sin(tau*random.x);
-        float z = sqrt(1.0-random.y);
+        float x = a*cos(C_TAU * random.x); 
+        float y = a*sin(C_TAU * random.x);
+        float z = sqrt(1.0 - random.y);
 
         /*
             For more efficiency we can generate proportionally
@@ -20,6 +20,7 @@
 
         return normalize(vec3(x*u+y*v+z*normal));
     }
+
     //crude ray offset
     vec3 offset(vec3 direction, vec3 multiplier, float rand){
         vec3 random = rand * multiplier - multiplier / 2.0;

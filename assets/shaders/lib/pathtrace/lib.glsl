@@ -1,0 +1,9 @@
+#include <pathtrace/common/uniforms.glsl>
+#include <pathtrace/common/globals.glsl>
+#include <pathtrace/common/intersection.glsl>
+#include <pathtrace/common/sampling.glsl>
+#include <pathtrace/common/anyhit.glsl>
+#include <pathtrace/common/closest_hit.glsl>
+#include <pathtrace/common/disney.glsl>
+#include <pathtrace/common/lambert.glsl>
+#include <pathtrace/common/pathtrace.glsl>

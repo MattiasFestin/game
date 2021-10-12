@@ -11,8 +11,13 @@ pub fn setup_camera(mut commands: Commands) {
         .looking_at(Vec3::new(10.0, 0.0, 0.0), Vec3::Y);
     commands
         .spawn()
-        .insert_bundle(PerspectiveCameraBundle {
-            ..Default::default()
+        .insert_bundle(OrthographicCameraBundle {
+            transform: t,
+            orthographic_projection: bevy::render::camera::OrthographicProjection {
+                scale: 0.01,
+                ..Default::default()
+            },
+            ..OrthographicCameraBundle::new_3d()
         })
         .insert(PlayerCamera {
             position: t.translation,
