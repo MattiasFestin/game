@@ -14,11 +14,14 @@ crate::resource!{
     struct PathTracer {
         width: f32,
         height: f32,
-        time: f32
+        time: f32,
+        samples: i32,
+        pathlenght: i32
     }
 }
 
 pub fn path_trace(
+    time: Res<Time>,
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -56,7 +59,7 @@ pub fn path_trace(
     
     crate::shaders::add_shader::<PathTracer>(&mut entity, asset_server, shader_cache, pipelines, render_graph, shaders);
 
-    entity.insert(PathTracer { width: window_size.width, height: window_size.height, time: 0.0 });
+    entity.insert(PathTracer { width: window_size.width, height: window_size.height, time: time.seconds_since_startup() as f32, samples: 10, pathlenght: 10 });
 }
 
 pub fn update_pt(
@@ -74,6 +77,21 @@ pub fn update_pt(
         }
 
         pt.time = time.seconds_since_startup() as f32;
+        let diff = 1.0/95.0 * (1.0/time.delta_seconds()).floor();
+        if diff > 1.10 {
+            if pt.pathlenght < 10 {
+                pt.pathlenght += 1;
+            } else {
+                pt.samples += 1;
+            }
+        } else if diff < 0.90 {
+            if pt.samples > 10 {
+                pt.samples -= 1;
+            } else {
+                pt.pathlenght -= 1;
+            }
+        }
+        // pt.samples = (1.0/time.delta_seconds()).floor() as i32;
     }
     // query.single_mut().
     // if let Ok(mut pt) = set.q0().single() {

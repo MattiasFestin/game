@@ -2,6 +2,7 @@
 #define LIB_MATERIAL
     #include <constants.glsl>
     #include <math.glsl>
+    #include <color.glsl>
     #include <structs.glsl>
     #include <ray.glsl>
 
@@ -62,24 +63,24 @@
         return top / bottom;
     }
 
-    // vec3 plancks_law_rgb(float temp) {
-    //     float r = plancks_law(C_R_FREQ, temp);
-    //     float g = plancks_law(C_G_FREQ, temp);
-    //     float b = plancks_law(C_B_FREQ, temp);
+    vec3 plancks_law_rgb(float temp) {
+        float r = plancks_law(C_R_FREQ, temp);
+        float g = plancks_law(C_G_FREQ, temp);
+        float b = plancks_law(C_B_FREQ, temp);
 
-    //     //TODO: Matrix mul
-    //     float r_s = (1.0 * r + 1.2 * g + 1.0 * b) * 0.70;
-    //     float g_s = (0.4 * r + 1.0 * g + 1.2 * b) * 0.85;
-    //     float b_s = 0.1 * r + 0.5 * g + 1.0 * b;
+        //TODO: Matrix mul
+        float r_s = (1.0 * r + 1.2 * g + 1.0 * b) * 0.70;
+        float g_s = (0.4 * r + 1.0 * g + 1.2 * b) * 0.85;
+        float b_s = 0.1 * r + 0.5 * g + 1.0 * b;
 
-    //     return XYZtosRGB(vec3(r_s, g_s, b_s));
-    // }
+        return XYZtosRGB(vec3(r_s, g_s, b_s));
+    }
 
-    // vec3 color_shifted_plank_law_rgb(float temp) {
-    //     vec3 c = plancks_law_rgb(temp);
-    //     float m = max3(c);
-    //     m = 1 / pow(m + 1e-10, 0.97);
-    //     return c * m;
-    // }
+    vec3 color_shifted_plank_law_rgb(float temp) {
+        vec3 c = plancks_law_rgb(temp);
+        float m = max3(c);
+        m = 1 / pow(m + 1e-10, 0.97);
+        return c * m;
+    }
     
 #endif

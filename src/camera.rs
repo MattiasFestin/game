@@ -7,8 +7,8 @@ use bevy_frustum_culling::FrustumCulling;
 use crate::constants::GLOBAL_SCALE;
 
 pub fn setup_camera(mut commands: Commands) {
-    let t = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0))
-        .looking_at(Vec3::new(10.0, 0.0, 0.0), Vec3::Y);
+    let mut t = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0))
+        .looking_at(Vec3::new(1.0, 0.0, 0.0), Vec3::Y);
     commands
         .spawn()
         .insert_bundle(OrthographicCameraBundle {
